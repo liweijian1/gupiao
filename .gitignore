@@ -1,0 +1,22 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Backend runtime data
+backend/data/cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.npm-cache/
+frontend/.npmrc
+
+# Logs and local env
+*.log
+.env
+.env.*
