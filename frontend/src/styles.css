@@ -36,6 +36,11 @@ button {
 }
 
 .rail {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  height: 100vh;
   border-right: 1px solid #252a31;
   background: rgba(10, 12, 16, 0.94);
   padding: 20px 14px;
@@ -101,8 +106,37 @@ small {
 }
 
 .rail nav button {
+  position: relative;
   justify-content: flex-start;
   padding: 9px 10px;
+}
+
+.rail nav button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 20;
+  padding: 7px 9px;
+  border: 1px solid #344047;
+  border-radius: 6px;
+  color: #eef5f2;
+  background: #11171c;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(4px, -50%);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.rail nav button:hover::after,
+.rail nav button:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
 .rail nav button.active,
@@ -215,6 +249,10 @@ small {
   border: 1px solid #262d33;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.nav-target {
+  scroll-margin-top: 14px;
 }
 
 .panel-title {
@@ -740,6 +778,10 @@ tbody tr:hover,
 
   .rail nav {
     display: flex;
+  }
+
+  .rail nav button::after {
+    display: none;
   }
 
   .workspace {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -233,7 +233,60 @@ export function App() {
   const [sortKey, setSortKey] = useState("score");
   const [macroSnapshot, setMacroSnapshot] = useState(null);
   const [stockSnapshot, setStockSnapshot] = useState(null);
+  const [searchSnapshot, setSearchSnapshot] = useState(null);
+  const [searchState, setSearchState] = useState("idle");
+  const [realtimeQuote, setRealtimeQuote] = useState(null);
+  const [realtimeState, setRealtimeState] = useState("idle");
+  const [activeNav, setActiveNav] = useState(0);
+  const screenerRef = useRef(null);
+  const macroRef = useRef(null);
+  const chartRef = useRef(null);
+  const reportRef = useRef(null);
+  const dataRef = useRef(null);
+  const navigationLockRef = useRef(false);
+  const navigationUnlockTimerRef = useRef(null);
   const t = copy[lang];
+
+  const handleNavigation = (index) => {
+    navigationLockRef.current = true;
+    window.clearTimeout(navigationUnlockTimerRef.current);
+    setActiveNav(index);
+    const target = [screenerRef, macroRef, chartRef, reportRef, dataRef][index]?.current;
+    target?.scrollIntoView({ behavior: "smooth", block: index === 3 ? "center" : "start" });
+    if (index === 3) {
+      window.setTimeout(() => target?.focus({ preventScroll: true }), 350);
+    }
+    navigationUnlockTimerRef.current = window.setTimeout(() => {
+      navigationLockRef.current = false;
+    }, 900);
+  };
+
+  useEffect(() => {
+    const targets = [
+      [screenerRef.current, 0],
+      [macroRef.current, 1],
+      [chartRef.current, 2],
+      [dataRef.current, 4],
+    ].filter(([element]) => element);
+    const visibility = new Map();
+    const observer = new IntersectionObserver((entries) => {
+      if (navigationLockRef.current) {
+        return;
+      }
+      entries.forEach((entry) => visibility.set(entry.target, entry.intersectionRatio));
+      const visibleTarget = targets
+        .map(([element, index]) => ({ index, ratio: visibility.get(element) ?? 0 }))
+        .sort((a, b) => b.ratio - a.ratio)[0];
+      if (visibleTarget?.ratio > 0.2) {
+        setActiveNav(visibleTarget.index);
+      }
+    }, { threshold: [0.2, 0.45, 0.7], rootMargin: "-72px 0px -18% 0px" });
+    targets.forEach(([element]) => observer.observe(element));
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(navigationUnlockTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -260,6 +313,54 @@ export function App() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
+      setSearchSnapshot(null);
+      setSearchState("idle");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let retryTimer;
+    const timer = window.setTimeout(() => {
+      setSearchState("loading");
+      const runSearch = async (attempt = 0) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/stocks/search?q=${encodeURIComponent(normalizedQuery)}&limit=30`, {
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            throw new Error(`Stock search API returned ${response.status}`);
+          }
+          const snapshot = await response.json();
+          if (snapshot.warning && snapshot.stocks?.length === 0 && attempt === 0) {
+            retryTimer = window.setTimeout(() => runSearch(1), 800);
+            return;
+          }
+          setSearchSnapshot(snapshot);
+          setSearchState(snapshot.warning && snapshot.stocks?.length === 0 ? "error" : "ready");
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            if (attempt === 0) {
+              retryTimer = window.setTimeout(() => runSearch(1), 800);
+            } else {
+              setSearchSnapshot({ stocks: [], warning: error.message });
+              setSearchState("error");
+            }
+          }
+        }
+      };
+      runSearch();
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(retryTimer);
+      controller.abort();
+    };
+  }, [query]);
 
   useEffect(() => {
     let mounted = true;
@@ -294,6 +395,19 @@ export function App() {
     return stocks;
   }, [stockSnapshot]);
 
+  const activeStockUniverse = query.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
+  const displayedStockUniverse = useMemo(() => (
+    activeStockUniverse.map((stock) => (
+      realtimeQuote?.ticker === stock.ticker
+        ? { ...stock, price: realtimeQuote.price, chg: realtimeQuote.chg, source: realtimeQuote.source }
+        : stock
+    ))
+  ), [activeStockUniverse, realtimeQuote]);
+  const detailStockUniverse = useMemo(() => {
+    const combined = [...stockUniverse, ...displayedStockUniverse];
+    return [...new Map(combined.map((stock) => [stock.ticker, stock])).values()];
+  }, [displayedStockUniverse, stockUniverse]);
+
   const macroSeries = useMemo(() => {
     if (!macroSnapshot?.series) {
       return macroInputs;
@@ -312,7 +426,59 @@ export function App() {
     }));
   }, [macroSnapshot]);
 
-  const selectedStock = stockUniverse.find((stock) => stock.ticker === selectedTicker) ?? stockUniverse[0] ?? stocks[0];
+  const selectedStock = detailStockUniverse.find((stock) => stock.ticker === selectedTicker) ?? detailStockUniverse[0] ?? stocks[0];
+
+  useEffect(() => {
+    const isAShare = ["SSE", "SZSE", "BSE", "A-share"].includes(selectedStock.exchange);
+    if (!isAShare || !/^\d{6}$/.test(selectedStock.ticker)) {
+      setRealtimeQuote(null);
+      setRealtimeState("idle");
+      return undefined;
+    }
+
+    let disposed = false;
+    let refreshTimer;
+    let controller;
+
+    const refreshRealtimeQuote = async () => {
+      let refreshAfterMs = 5000;
+      controller = new AbortController();
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/stocks/realtime?symbol=${encodeURIComponent(selectedStock.ticker)}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Realtime API returned ${response.status}`);
+        }
+        const payload = await response.json();
+        refreshAfterMs = Math.max(5000, Number(payload.refresh_after_seconds ?? 5) * 1000);
+        if (!disposed && payload.quote) {
+          setRealtimeQuote(payload.quote);
+          setRealtimeState(payload.market_open === false ? "cached" : payload.stale ? "stale" : "live");
+        } else if (!disposed) {
+          setRealtimeState("stale");
+        }
+      } catch (error) {
+        if (!disposed && error.name !== "AbortError") {
+          setRealtimeState("stale");
+        }
+      } finally {
+        if (!disposed) {
+          refreshTimer = window.setTimeout(refreshRealtimeQuote, refreshAfterMs);
+        }
+      }
+    };
+
+    setRealtimeQuote(null);
+    setRealtimeState("loading");
+    refreshRealtimeQuote();
+
+    return () => {
+      disposed = true;
+      controller?.abort();
+      window.clearTimeout(refreshTimer);
+    };
+  }, [selectedStock.exchange, selectedStock.ticker]);
   const growthScore = macroSnapshot?.scores?.economic_climate ?? weightedScore(macroSeries.filter((item) => item.group === "Growth" || item.group === "Property"));
   const liquidityScore = macroSnapshot?.scores?.liquidity ?? weightedScore(macroSeries.filter((item) => item.group === "Liquidity" || item.group === "Rates"));
   const inflationScore = macroSnapshot?.scores?.inflation ?? weightedScore(macroSeries.filter((item) => item.group === "Inflation"));
@@ -321,7 +487,7 @@ export function App() {
 
   const filteredStocks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return stockUniverse
+    return displayedStockUniverse
       .filter((stock) => {
         const matchesQuery =
           normalizedQuery.length === 0 ||
@@ -346,7 +512,7 @@ export function App() {
         return matchesQuery && (normalizedQuery.length > 0 || factorGate);
       })
       .sort((a, b) => b[sortKey] - a[sortKey]);
-  }, [query, factors, sortKey, stockUniverse, t.sectors]);
+  }, [query, factors, sortKey, displayedStockUniverse, t.sectors]);
 
   useEffect(() => {
     if (query.trim().length > 0 && filteredStocks.length > 0) {
@@ -373,7 +539,13 @@ export function App() {
     return matchesGroup && matchesQuery;
   });
   const macroSource = macroSnapshot?.source ?? "mock";
-  const stockSource = stockSnapshot?.source ?? "mock";
+  const stockSource = realtimeState === "live"
+    ? `akshare · realtime${realtimeQuote?.market_time ? ` · ${realtimeQuote.market_time}` : ""}`
+    : realtimeState === "cached"
+      ? `cache · market closed${realtimeQuote?.market_date ? ` · ${realtimeQuote.market_date}` : ""}`
+    : realtimeState === "stale"
+      ? "akshare · retrying"
+      : (query.trim() && searchSnapshot?.source) || stockSnapshot?.source || "mock";
 
   return (
     <main className="terminal">
@@ -386,11 +558,24 @@ export function App() {
           </div>
         </div>
         <nav>
-          <button className="active"><BarChart3 size={17} /> <span>{t.nav[0]}</span></button>
-          <button><Activity size={17} /> <span>{t.nav[1]}</span></button>
-          <button><LineChart size={17} /> <span>{t.nav[2]}</span></button>
-          <button><BookOpenCheck size={17} /> <span>{t.nav[3]}</span></button>
-          <button><Database size={17} /> <span>{t.nav[4]}</span></button>
+          {[
+            [BarChart3, 0],
+            [Activity, 1],
+            [LineChart, 2],
+            [BookOpenCheck, 3],
+            [Database, 4],
+          ].map(([Icon, index]) => (
+            <button
+              className={activeNav === index ? "active" : ""}
+              aria-current={activeNav === index ? "page" : undefined}
+              aria-label={t.nav[index]}
+              data-tooltip={t.nav[index]}
+              onClick={() => handleNavigation(index)}
+              key={t.nav[index]}
+            >
+              <Icon size={17} /> <span>{t.nav[index]}</span>
+            </button>
+          ))}
         </nav>
         <div className="rail-card">
           <small>{t.pipeline}</small>
@@ -418,11 +603,11 @@ export function App() {
             <button className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>EN</button>
           </div>
           <button className="icon-button" aria-label="Alerts"><Bell size={18} /></button>
-          <button className="primary"><Download size={16} /> {t.export}</button>
+          <button className="primary" ref={reportRef}><Download size={16} /> {t.export}</button>
         </header>
 
         <div className="content-grid">
-          <section className="panel factor-panel">
+          <section className="panel factor-panel nav-target" ref={screenerRef}>
             <div className="panel-title">
               <div>
                 <small>{t.factorBuilder}</small>
@@ -476,7 +661,13 @@ export function App() {
               <tbody>
                 {filteredStocks.length === 0 && (
                   <tr>
-                    <td className="empty-row" colSpan={9}>{lang === "zh" ? "没有找到匹配的股票" : "No matching equities"}</td>
+                    <td className="empty-row" colSpan={9} aria-live="polite">
+                      {searchState === "loading"
+                        ? (lang === "zh" ? "正在查询 A 股实时数据…" : "Searching live A-share data…")
+                        : searchState === "error"
+                          ? (lang === "zh" ? "实时行情源暂时不可用，请稍后重试" : "Live market source is temporarily unavailable")
+                          : (lang === "zh" ? "没有找到匹配的股票" : "No matching equities")}
+                    </td>
                   </tr>
                 )}
                 {filteredStocks.map((stock) => (
@@ -496,7 +687,7 @@ export function App() {
             </table>
           </section>
 
-          <section className="panel detail-panel">
+          <section className="panel detail-panel nav-target" ref={chartRef}>
             <div className="panel-title compact">
               <div>
                 <small>{t.selectedEquity}</small>
@@ -527,7 +718,7 @@ export function App() {
             </div>
           </section>
 
-          <section className="panel macro-panel">
+          <section className="panel macro-panel nav-target" ref={macroRef}>
             <div className="panel-title">
               <div>
                 <small>{t.macroModel}</small>
@@ -562,7 +753,7 @@ export function App() {
             </div>
           </section>
 
-          <section className="panel macro-table">
+          <section className="panel macro-table nav-target" ref={dataRef}>
             <div className="panel-title compact">
               <div>
                 <small>{t.macroSeries}</small>

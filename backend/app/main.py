@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import CORS_ORIGINS
 from .indicators import INDICATORS
 from .service import get_macro_snapshot, refresh_macro_snapshot
-from .stocks import get_stock_snapshot, stock_quote, stock_search, fetch_stock_snapshot
+from .stocks import get_stock_snapshot, stock_quote, stock_realtime_quote, stock_search, fetch_stock_snapshot
 
 
 app = FastAPI(
@@ -81,6 +81,11 @@ def stocks_search(q: str = Query(default=""), limit: int = Query(default=50, ge=
 @app.get("/api/stocks/quote")
 def stocks_quote(symbol: str = Query(...)) -> Dict[str, Any]:
     return stock_quote(symbol)
+
+
+@app.get("/api/stocks/realtime")
+def stocks_realtime(symbol: str = Query(...), force: bool = Query(default=False)) -> Dict[str, Any]:
+    return stock_realtime_quote(symbol, force_refresh=force)
 
 
 @app.post("/api/stocks/refresh")

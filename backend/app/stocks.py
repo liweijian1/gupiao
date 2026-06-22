@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+import os
+from datetime import datetime, time, timedelta, timezone
 from importlib import import_module
+from threading import RLock
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+import requests
 
 from .config import CACHE_DIR
 
@@ -13,6 +17,22 @@ from .config import CACHE_DIR
 STOCK_SNAPSHOT_PATH = CACHE_DIR / "stock_snapshot.json"
 MAX_STOCK_CACHE_AGE = timedelta(minutes=20)
 BAOSTOCK_LOOKBACK_DAYS = 180
+BAOSTOCK_LOCK = RLock()
+REALTIME_QUOTE_TTL = timedelta(seconds=5)
+REALTIME_QUOTE_LOCK = RLock()
+REALTIME_QUOTE_CACHE: dict[str, dict[str, Any]] = {}
+CHINA_TIMEZONE = ZoneInfo("Asia/Shanghai")
+
+
+def add_no_proxy_host(host: str) -> None:
+    for key in ("NO_PROXY", "no_proxy"):
+        current = [item.strip() for item in os.environ.get(key, "").split(",") if item.strip()]
+        if host not in current:
+            current.append(host)
+            os.environ[key] = ",".join(current)
+
+
+add_no_proxy_host("push2.eastmoney.com")
 
 FALLBACK_STOCKS = [
     {"ticker": "600519", "name": "Kweichow Moutai", "aliases": ["贵州茅台", "茅台", "600519.SH"], "exchange": "SSE", "currency": "¥", "sector": "Consumer", "price": 1468.6, "chg": 0.7, "score": 83, "pe": 23.4, "growth": 15.1, "rsi": 56, "beta": 0.6, "trend": 73, "liquidity": 88, "source": "fallback"},
@@ -186,6 +206,10 @@ def normalize_baostock_history(history: pd.DataFrame, bs_code: str, name: str | 
         return None
 
     clean = history.copy()
+    if "code" in clean.columns:
+        clean = clean.loc[clean["code"] == bs_code].copy()
+    if clean.empty:
+        return None
     for column in ["close", "preclose", "turn", "pctChg", "peTTM", "amount"]:
         clean[column] = pd.to_numeric(clean[column], errors="coerce")
     clean = clean.dropna(subset=["close"])
@@ -273,23 +297,24 @@ def fetch_baostock_stock(bs: Any, symbol: str) -> dict[str, Any] | None:
 
 
 def fetch_baostock_snapshot() -> tuple[list[dict[str, Any]], list[str]]:
-    bs = load_baostock()
-    errors: list[str] = []
-    collected: list[dict[str, Any]] = []
-    login = bs.login()
-    if login.error_code != "0":
-        raise RuntimeError(f"baostock login failed: {login.error_msg}")
+    with BAOSTOCK_LOCK:
+        bs = load_baostock()
+        errors: list[str] = []
+        collected: list[dict[str, Any]] = []
+        login = bs.login()
+        if login.error_code != "0":
+            raise RuntimeError(f"baostock login failed: {login.error_msg}")
 
-    try:
-        for code in A_SHARE_SEED_CODES:
-            try:
-                stock = fetch_baostock_stock(bs, code)
-                if stock:
-                    collected.append(stock)
-            except Exception as exc:  # noqa: BLE001 - one bad symbol should not fail the source.
-                errors.append(f"baostock {code}: {exc}")
-    finally:
-        bs.logout()
+        try:
+            for code in A_SHARE_SEED_CODES:
+                try:
+                    stock = fetch_baostock_stock(bs, code)
+                    if stock:
+                        collected.append(stock)
+                except Exception as exc:  # noqa: BLE001 - one bad symbol should not fail the source.
+                    errors.append(f"baostock {code}: {exc}")
+        finally:
+            bs.logout()
 
     return collected, errors
 
@@ -416,6 +441,204 @@ def get_stock_snapshot(force_refresh: bool = False) -> dict[str, Any]:
         return snapshot
 
 
+def fetch_akshare_realtime_values(symbol: str) -> dict[str, Any]:
+    ak = load_akshare()
+    frame = ak.stock_bid_ask_em(symbol=symbol)
+    values = {
+        str(row["item"]): row["value"]
+        for _, row in frame.iterrows()
+        if "item" in row and "value" in row
+    }
+    price = number(values.get("最新"))
+    if price <= 0:
+        raise RuntimeError("AKShare returned no valid latest price")
+    return {
+        "price": price,
+        "chg": number(values.get("涨幅")),
+        "open": number(values.get("今开")),
+        "high": number(values.get("最高")),
+        "low": number(values.get("最低")),
+        "previous_close": number(values.get("昨收")),
+        "average_price": number(values.get("均价")),
+        "volume": number(values.get("总手")) * 100,
+        "amount": number(values.get("金额")),
+        "turnover": number(values.get("换手")),
+        "buy_1": number(values.get("buy_1")),
+        "sell_1": number(values.get("sell_1")),
+        "market_date": None,
+        "market_time": None,
+        "provider": "eastmoney",
+    }
+
+
+def fetch_sina_realtime_values(symbol: str) -> dict[str, Any]:
+    prefix = "sh" if symbol.startswith(("5", "6", "9")) else "bj" if symbol.startswith(("4", "8")) else "sz"
+    session = requests.Session()
+    session.trust_env = False
+    response = session.get(
+        f"https://hq.sinajs.cn/list={prefix}{symbol}",
+        headers={"Referer": "https://finance.sina.com.cn/"},
+        timeout=8,
+    )
+    response.raise_for_status()
+    response.encoding = "gbk"
+    payload = response.text.split('="', 1)[-1].rsplit('"', 1)[0]
+    fields = payload.split(",")
+    if len(fields) < 32:
+        raise RuntimeError("Sina returned an incomplete realtime quote")
+    price = number(fields[3])
+    previous_close = number(fields[2])
+    if price <= 0:
+        raise RuntimeError("Sina returned no valid latest price")
+    chg = 0 if previous_close <= 0 else (price / previous_close - 1) * 100
+    volume = number(fields[8])
+    amount = number(fields[9])
+    return {
+        "price": price,
+        "chg": chg,
+        "open": number(fields[1]),
+        "high": number(fields[4]),
+        "low": number(fields[5]),
+        "previous_close": previous_close,
+        "average_price": amount / volume if volume > 0 else price,
+        "volume": volume,
+        "amount": amount,
+        "turnover": 0,
+        "buy_1": number(fields[6]),
+        "sell_1": number(fields[7]),
+        "market_date": fields[30],
+        "market_time": fields[31],
+        "provider": "sina",
+    }
+
+
+def is_china_market_open(at: datetime | None = None) -> bool:
+    china_now = (at or datetime.now(timezone.utc)).astimezone(CHINA_TIMEZONE)
+    return china_now.weekday() < 5 and time(9, 0) <= china_now.time() < time(15, 0)
+
+
+def stock_cached_quote(symbol: str, now: datetime) -> dict[str, Any]:
+    realtime_cached = REALTIME_QUOTE_CACHE.get(symbol)
+    if realtime_cached and realtime_cached.get("quote"):
+        quote = {**realtime_cached["quote"], "source": "stock-cache"}
+        return {
+            "quote": quote,
+            "source": "stock-cache",
+            "updated_at": realtime_cached["updated_at"],
+            "market_open": False,
+            "market_status": "closed",
+            "refresh_after_seconds": 60,
+        }
+
+    snapshot = read_stock_cache()
+    if snapshot:
+        stock = next((item for item in snapshot.get("stocks", []) if item.get("ticker") == symbol), None)
+        if stock:
+            quote = {
+                "ticker": symbol,
+                "price": stock.get("price", 0),
+                "chg": stock.get("chg", 0),
+                "market_date": stock.get("latest_date"),
+                "market_time": None,
+                "provider": stock.get("source", snapshot.get("source", "cache")),
+                "source": "stock-cache",
+            }
+            return {
+                "quote": quote,
+                "source": "stock-cache",
+                "updated_at": snapshot.get("updated_at", now.isoformat()),
+                "market_open": False,
+                "market_status": "closed",
+                "refresh_after_seconds": 60,
+            }
+
+    return {
+        "quote": None,
+        "source": "stock-cache",
+        "updated_at": now.isoformat(),
+        "market_open": False,
+        "market_status": "closed",
+        "refresh_after_seconds": 60,
+        "warning": "No cached quote is available for this symbol",
+    }
+
+
+def stock_realtime_quote(symbol: str, force_refresh: bool = False) -> dict[str, Any]:
+    compact_symbol = symbol.strip().lower().replace(".sh", "").replace(".sz", "").replace("sh.", "").replace("sz.", "")
+    now = datetime.now(timezone.utc)
+    if len(compact_symbol) != 6 or not compact_symbol.isdigit():
+        return {
+            "quote": None,
+            "source": "akshare-realtime",
+            "updated_at": now.isoformat(),
+            "warning": "A-share symbol must be a 6-digit code",
+        }
+
+    with REALTIME_QUOTE_LOCK:
+        if not is_china_market_open(now):
+            return stock_cached_quote(compact_symbol, now)
+
+        cached = REALTIME_QUOTE_CACHE.get(compact_symbol)
+        if cached and not force_refresh:
+            cached_at = datetime.fromisoformat(cached["updated_at"])
+            if now - cached_at < REALTIME_QUOTE_TTL:
+                return cached
+
+        try:
+            provider_warning = None
+            try:
+                values = fetch_akshare_realtime_values(compact_symbol)
+            except Exception as akshare_exc:  # noqa: BLE001 - Sina is an AKShare-supported realtime fallback.
+                values = fetch_sina_realtime_values(compact_symbol)
+                provider_warning = f"Eastmoney unavailable; using Sina realtime source: {akshare_exc}"
+
+            quote = {
+                "ticker": compact_symbol,
+                "price": round(values["price"], 2),
+                "chg": round(values["chg"], 2),
+                "open": round(values["open"], 2),
+                "high": round(values["high"], 2),
+                "low": round(values["low"], 2),
+                "previous_close": round(values["previous_close"], 2),
+                "average_price": round(values["average_price"], 2),
+                "volume": round(values["volume"]),
+                "amount": round(values["amount"], 2),
+                "turnover": round(values["turnover"], 2),
+                "buy_1": round(values["buy_1"], 2),
+                "sell_1": round(values["sell_1"], 2),
+                "market_date": values["market_date"],
+                "market_time": values["market_time"],
+                "provider": values["provider"],
+                "source": "akshare-realtime",
+            }
+            result = {
+                "quote": quote,
+                "source": "akshare-realtime",
+                "updated_at": now.isoformat(),
+                "cache_ttl_seconds": int(REALTIME_QUOTE_TTL.total_seconds()),
+                "market_open": True,
+                "market_status": "open",
+                "refresh_after_seconds": int(REALTIME_QUOTE_TTL.total_seconds()),
+            }
+            if provider_warning:
+                result["notice"] = provider_warning
+            REALTIME_QUOTE_CACHE[compact_symbol] = result
+            return result
+        except Exception as exc:  # noqa: BLE001 - preserve the last good quote during source outages.
+            if cached:
+                return {
+                    **cached,
+                    "stale": True,
+                    "warning": f"AKShare realtime refresh failed; returning last quote: {exc}",
+                }
+            return {
+                "quote": None,
+                "source": "akshare-realtime",
+                "updated_at": now.isoformat(),
+                "warning": f"AKShare realtime quote failed: {exc}",
+            }
+
+
 def stock_search(query: str = "", limit: int = 50) -> dict[str, Any]:
     snapshot = get_stock_snapshot()
     normalized = query.strip().lower()
@@ -432,28 +655,106 @@ def stock_search(query: str = "", limit: int = 50) -> dict[str, Any]:
         ]).lower()
         return normalized in haystack
 
-    return {**snapshot, "stocks": [stock for stock in snapshot["stocks"] if matches(stock)][:limit]}
+    compact_symbol = normalized.replace(".sh", "").replace(".sz", "").replace("sh.", "").replace("sz.", "")
+    if len(compact_symbol) == 6 and compact_symbol.isdigit():
+        quote = stock_quote(compact_symbol)
+        if quote.get("stock"):
+            return {
+                "stocks": [quote["stock"]],
+                "source": quote["source"],
+                "updated_at": quote["updated_at"],
+                "query": query,
+            }
+
+    local_matches = [stock for stock in snapshot["stocks"] if matches(stock)][:limit]
+    if local_matches:
+        return {**snapshot, "stocks": local_matches, "query": query}
+
+    for _ in range(2):
+        try:
+            with BAOSTOCK_LOCK:
+                bs = load_baostock()
+                login = bs.login()
+                if login.error_code != "0":
+                    raise RuntimeError(login.error_msg)
+                try:
+                    basic = bs.query_stock_basic(code_name=query.strip())
+                    if basic.error_code == "0":
+                        candidates = basic.get_data()
+                        named_matches = []
+                        if "code" in candidates.columns:
+                            for _, candidate in candidates.head(limit).iterrows():
+                                stock = fetch_baostock_stock(bs, str(candidate["code"]))
+                                if stock:
+                                    named_matches.append(stock)
+                        if named_matches:
+                            return {
+                                "stocks": named_matches,
+                                "source": "baostock",
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                                "query": query,
+                            }
+                finally:
+                    bs.logout()
+        except Exception:
+            continue
+
+    try:
+        ak = load_akshare()
+        frame = ak.stock_zh_a_spot_em()
+        code_column = next((column for column in ["代码", "code", "symbol"] if column in frame.columns), None)
+        name_column = next((column for column in ["名称", "name", "简称"] if column in frame.columns), None)
+        if code_column or name_column:
+            mask = pd.Series(False, index=frame.index)
+            if code_column:
+                mask |= frame[code_column].astype(str).str.lower().str.contains(normalized, regex=False)
+            if name_column:
+                mask |= frame[name_column].astype(str).str.lower().str.contains(normalized, regex=False)
+            remote_matches = normalize_spot_frame(frame.loc[mask].head(limit), "a")
+            if remote_matches:
+                return {
+                    "stocks": remote_matches,
+                    "source": "akshare",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "query": query,
+                }
+    except Exception as exc:  # noqa: BLE001 - report a usable search miss to the client.
+        return {
+            **snapshot,
+            "stocks": [],
+            "query": query,
+            "warning": f"remote A-share search failed: {exc}",
+        }
+
+    return {**snapshot, "stocks": [], "query": query, "warning": "symbol or company name not found"}
 
 
 def stock_quote(symbol: str) -> dict[str, Any]:
     normalized = symbol.strip().lower()
     snapshot = get_stock_snapshot()
-    for stock in snapshot["stocks"]:
-        aliases = [alias.lower() for alias in stock.get("aliases") or []]
-        if normalized in {stock["ticker"].lower(), *aliases}:
-            return {"stock": stock, "source": snapshot["source"], "updated_at": snapshot["updated_at"]}
-    if normalized.replace(".sh", "").replace(".sz", "").isdigit():
+    compact_symbol = normalized.replace(".sh", "").replace(".sz", "").replace("sh.", "").replace("sz.", "")
+    live_warning = None
+    if len(compact_symbol) == 6 and compact_symbol.isdigit():
         try:
-            bs = load_baostock()
-            login = bs.login()
-            if login.error_code != "0":
-                raise RuntimeError(login.error_msg)
-            try:
-                stock = fetch_baostock_stock(bs, normalized)
-            finally:
-                bs.logout()
+            with BAOSTOCK_LOCK:
+                bs = load_baostock()
+                login = bs.login()
+                if login.error_code != "0":
+                    raise RuntimeError(login.error_msg)
+                try:
+                    stock = fetch_baostock_stock(bs, normalized)
+                finally:
+                    bs.logout()
             if stock:
                 return {"stock": stock, "source": "baostock", "updated_at": datetime.now(timezone.utc).isoformat()}
         except Exception as exc:  # noqa: BLE001 - return a structured miss below.
-            return {"stock": None, "source": snapshot["source"], "updated_at": snapshot["updated_at"], "warning": f"symbol not found; baostock quote failed: {exc}"}
-    return {"stock": None, "source": snapshot["source"], "updated_at": snapshot["updated_at"], "warning": "symbol not found"}
+            live_warning = f"live baostock quote failed: {exc}"
+
+    for stock in snapshot["stocks"]:
+        aliases = [alias.lower() for alias in stock.get("aliases") or []]
+        if normalized in {stock["ticker"].lower(), *aliases} or compact_symbol == stock["ticker"].lower():
+            result = {"stock": stock, "source": snapshot["source"], "updated_at": snapshot["updated_at"]}
+            if live_warning:
+                result["warning"] = f"{live_warning}; returning cached quote"
+            return result
+    return {"stock": None, "source": snapshot["source"], "updated_at": snapshot["updated_at"], "warning": live_warning or "symbol not found"}
