@@ -819,3 +819,37 @@ tbody tr:hover,
     min-height: 320px;
   }
 }
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.provider-status {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.source-notice {
+  margin: 6px 0 0;
+  color: #d4a24c;
+  font-size: 12px;
+}
+
+.provider-diag {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  border-bottom: 1px solid #242a30;
+  background: #0a0e12;
+}
+
+.provider-diag span {
+  color: #8fa0a8;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid #243038;
+  border-radius: 999px;
+}

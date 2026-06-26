@@ -18,209 +18,18 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-const stocks = [
-  { ticker: "NVDA", name: "NVIDIA", aliases: ["英伟达"], exchange: "NASDAQ", currency: "$", sector: "Semis", price: 178.42, chg: 2.8, score: 92, pe: 38.6, growth: 31.2, rsi: 63, beta: 1.7, trend: 88, liquidity: 96 },
-  { ticker: "MSFT", name: "Microsoft", aliases: ["微软"], exchange: "NASDAQ", currency: "$", sector: "Software", price: 503.71, chg: 0.9, score: 88, pe: 34.1, growth: 14.5, rsi: 58, beta: 0.9, trend: 81, liquidity: 93 },
-  { ticker: "AVGO", name: "Broadcom", aliases: ["博通"], exchange: "NASDAQ", currency: "$", sector: "Semis", price: 291.33, chg: 1.5, score: 86, pe: 32.8, growth: 18.9, rsi: 61, beta: 1.3, trend: 84, liquidity: 89 },
-  { ticker: "AAPL", name: "Apple", aliases: ["苹果"], exchange: "NASDAQ", currency: "$", sector: "Hardware", price: 214.15, chg: -0.4, score: 74, pe: 29.3, growth: 4.1, rsi: 47, beta: 1.1, trend: 58, liquidity: 95 },
-  { ticker: "JPM", name: "JPMorgan", aliases: ["摩根大通"], exchange: "NYSE", currency: "$", sector: "Banks", price: 266.22, chg: 0.3, score: 71, pe: 13.2, growth: 6.8, rsi: 52, beta: 1.0, trend: 62, liquidity: 87 },
-  { ticker: "XOM", name: "Exxon Mobil", aliases: ["埃克森美孚"], exchange: "NYSE", currency: "$", sector: "Energy", price: 109.84, chg: -1.1, score: 62, pe: 15.4, growth: -1.7, rsi: 41, beta: 0.8, trend: 39, liquidity: 78 },
-  { ticker: "COST", name: "Costco", aliases: ["开市客"], exchange: "NASDAQ", currency: "$", sector: "Retail", price: 983.44, chg: 0.6, score: 79, pe: 52.7, growth: 8.2, rsi: 55, beta: 0.7, trend: 67, liquidity: 75 },
-  { ticker: "AMD", name: "AMD", aliases: ["超威半导体"], exchange: "NASDAQ", currency: "$", sector: "Semis", price: 126.91, chg: -2.2, score: 69, pe: 41.4, growth: 12.4, rsi: 38, beta: 1.9, trend: 44, liquidity: 91 },
-  { ticker: "600519", name: "Kweichow Moutai", aliases: ["贵州茅台", "茅台", "600519.SH"], exchange: "SSE", currency: "¥", sector: "Consumer", price: 1468.6, chg: 0.7, score: 83, pe: 23.4, growth: 15.1, rsi: 56, beta: 0.6, trend: 73, liquidity: 88 },
-  { ticker: "300750", name: "CATL", aliases: ["宁德时代", "300750.SZ"], exchange: "SZSE", currency: "¥", sector: "NewEnergy", price: 258.2, chg: 1.8, score: 87, pe: 24.9, growth: 21.7, rsi: 62, beta: 1.4, trend: 79, liquidity: 91 },
-  { ticker: "002594", name: "BYD", aliases: ["比亚迪", "002594.SZ"], exchange: "SZSE", currency: "¥", sector: "Auto", price: 312.5, chg: 1.2, score: 84, pe: 28.1, growth: 18.4, rsi: 59, beta: 1.2, trend: 77, liquidity: 89 },
-  { ticker: "600036", name: "China Merchants Bank", aliases: ["招商银行", "招行", "600036.SH"], exchange: "SSE", currency: "¥", sector: "Banks", price: 41.2, chg: -0.3, score: 72, pe: 7.3, growth: 3.2, rsi: 49, beta: 0.8, trend: 57, liquidity: 92 },
-  { ticker: "601318", name: "Ping An Insurance", aliases: ["中国平安", "平安", "601318.SH"], exchange: "SSE", currency: "¥", sector: "Insurance", price: 52.8, chg: 0.5, score: 70, pe: 8.6, growth: 4.9, rsi: 51, beta: 0.9, trend: 61, liquidity: 90 },
-  { ticker: "000858", name: "Wuliangye", aliases: ["五粮液", "000858.SZ"], exchange: "SZSE", currency: "¥", sector: "Consumer", price: 128.4, chg: -0.8, score: 68, pe: 18.9, growth: 6.1, rsi: 44, beta: 0.7, trend: 48, liquidity: 84 },
-  { ticker: "600276", name: "Hengrui Medicine", aliases: ["恒瑞医药", "600276.SH"], exchange: "SSE", currency: "¥", sector: "Healthcare", price: 47.6, chg: 2.1, score: 76, pe: 39.5, growth: 12.7, rsi: 64, beta: 1.0, trend: 69, liquidity: 82 },
-  { ticker: "0700.HK", name: "Tencent", aliases: ["腾讯控股", "腾讯", "00700", "700.HK"], exchange: "HKEX", currency: "HK$", sector: "Internet", price: 418.0, chg: 0.4, score: 82, pe: 19.7, growth: 10.5, rsi: 54, beta: 1.1, trend: 71, liquidity: 94 },
-  { ticker: "9988.HK", name: "Alibaba", aliases: ["阿里巴巴", "阿里", "BABA"], exchange: "HKEX", currency: "HK$", sector: "Internet", price: 89.7, chg: -0.6, score: 73, pe: 13.8, growth: 5.8, rsi: 46, beta: 1.2, trend: 55, liquidity: 93 },
-];
-
-const macroInputs = [
-  { key: "PMI", group: "Growth", api: "macro_china_pmi()", value: 50.4, unit: "", direction: 1, z: 0.42, weight: 0.35 },
-  { key: "M1", group: "Liquidity", api: "macro_china_supply_of_money()", value: 5.8, unit: "%", direction: 1, z: -0.18, weight: 0.2 },
-  { key: "M2", group: "Liquidity", api: "macro_china_supply_of_money()", value: 7.0, unit: "%", direction: 1, z: 0.12, weight: 0.25 },
-  { key: "Social Financing", group: "Liquidity", api: "macro_china_shrzgm()", value: 2.28, unit: "T CNY", direction: 1, z: 0.36, weight: 0.25 },
-  { key: "New Loans", group: "Liquidity", api: "macro_rmb_loan()", value: 0.95, unit: "T CNY", direction: 1, z: 0.08, weight: 0.15 },
-  { key: "CPI", group: "Inflation", api: "macro_china_cpi()", value: 0.3, unit: "%", direction: 1, z: -0.34, weight: 0.55 },
-  { key: "PPI", group: "Inflation", api: "macro_china_ppi()", value: -1.4, unit: "%", direction: 1, z: -0.61, weight: 0.45 },
-  { key: "Fixed Asset Inv.", group: "Growth", api: "macro_china_gdzctz()", value: 3.7, unit: "%", direction: 1, z: 0.18, weight: 0.25 },
-  { key: "Home Sales Area", group: "Property", api: "macro_china_nbs_nation()", value: -19.1, unit: "%", direction: 1, z: -0.82, weight: 0.2 },
-  { key: "Unemployment", group: "Growth", api: "macro_china_urban_unemployment()", value: 5.0, unit: "%", direction: -1, z: 0.2, weight: 0.2 },
-  { key: "FX Reserves", group: "External", api: "macro_china_fx_reserves_yearly()", value: 3.23, unit: "T USD", direction: 1, z: 0.09, weight: 0.45 },
-  { key: "CN 10Y Yield", group: "Rates", api: "bond_china_yield()", value: 1.72, unit: "%", direction: -1, z: -0.38, weight: 0.15 },
-  { key: "USD/CNY", group: "External", api: "currency_history()", value: 7.18, unit: "", direction: -1, z: 0.28, weight: 0.55 },
-];
-
-const factorDefaults = {
-  momentum: 68,
-  quality: 52,
-  valuation: 35,
-  liquidity: 70,
-  volatility: 45,
-};
-
-const spark = [38, 44, 41, 52, 48, 61, 58, 66, 72, 69, 78, 84];
-const macroTrend = [48, 50, 52, 55, 53, 56, 58, 61, 60, 64, 66, 68];
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-
-const copy = {
-  en: {
-    lab: "CN Macro Lab",
-    nav: ["Screener", "Macro", "Charts", "Reports", "AkShare"],
-    pipeline: "Data pipeline",
-    cache: "AkShare cache",
-    refresh: "Daily refresh · 13 series",
-    sync: "Sync",
-    search: "Search ticker, sector, factor, macro series",
-    export: "Export report",
-    factorBuilder: "Factor builder",
-    quantScreen: "Quant screen",
-    chips: ["AI leaders", "Low beta", "Revision up", "High cash", "CN macro sensitive"],
-    backtest: "Backtest preview",
-    alpha: "12M alpha",
-    matches: "matches",
-    ranked: "Ranked equities",
-    selectedEquity: "Selected equity",
-    macroModel: "AkShare macro model",
-    macroDashboard: "China regime dashboard",
-    modelInputs: "Model inputs",
-    macroSeries: "13 AkShare series",
-    macroMap: "Macro data map",
-    composite: "Composite",
-    compositeScore: "Composite macro score",
-    currentRead: "Current read: liquidity is improving while inflation pressure remains muted. Growth is stabilizing, but property remains the drag.",
-    axes: { growth: "Growth", inflation: "Inflation" },
-    table: ["Ticker", "Sector", "Price", "Chg", "Score", "P/E", "Growth", "RSI", "Trend"],
-    scores: {
-      growth: ["Economic climate", "PMI, FAI, property, unemployment"],
-      liquidity: ["Liquidity", "M1, M2, TSF, loans, CN10Y"],
-      inflation: ["Inflation", "CPI and PPI pressure"],
-      external: ["External pressure", "USD/CNY and FX reserves"],
-    },
-    factors: { momentum: "momentum", quality: "quality", valuation: "valuation", liquidity: "liquidity", volatility: "volatility" },
-    sort: { score: "score", growth: "growth", trend: "trend" },
-    sectors: { Semis: "Semis", Software: "Software", Hardware: "Hardware", Banks: "Banks", Energy: "Energy", Retail: "Retail", Consumer: "Consumer", NewEnergy: "New Energy", Auto: "Auto", Insurance: "Insurance", Healthcare: "Healthcare", Internet: "Internet", Property: "Property" },
-    groups: { All: "All", Growth: "Growth", Liquidity: "Liquidity", Inflation: "Inflation", Property: "Property", Rates: "Rates", External: "External" },
-    macro: {
-      PMI: "PMI",
-      M1: "M1",
-      M2: "M2",
-      "Social Financing": "Social Financing",
-      "New Loans": "New Loans",
-      CPI: "CPI",
-      PPI: "PPI",
-      "Fixed Asset Inv.": "Fixed Asset Inv.",
-      "Home Sales Area": "Home Sales Area",
-      Unemployment: "Unemployment",
-      "FX Reserves": "FX Reserves",
-      "CN 10Y Yield": "CN 10Y Yield",
-      "USD/CNY": "USD/CNY",
-    },
-    cycles: { Recovery: "Recovery", Overheat: "Overheat", Slowdown: "Slowdown", Stagflation: "Stagflation" },
-  },
-  zh: {
-    lab: "中国宏观实验室",
-    nav: ["筛选器", "宏观", "图表", "报告", "AkShare"],
-    pipeline: "数据管道",
-    cache: "AkShare 缓存",
-    refresh: "每日刷新 · 13 组指标",
-    sync: "同步",
-    search: "搜索股票、行业、因子或宏观指标",
-    export: "导出报告",
-    factorBuilder: "因子构建器",
-    quantScreen: "量化筛选",
-    chips: ["AI 龙头", "低波动", "盈利上修", "高现金流", "中国宏观敏感"],
-    backtest: "回测预览",
-    alpha: "12个月超额",
-    matches: "个结果",
-    ranked: "股票排名",
-    selectedEquity: "选中股票",
-    macroModel: "AkShare 宏观模型",
-    macroDashboard: "中国周期驾驶舱",
-    modelInputs: "模型输入",
-    macroSeries: "13 组 AkShare 指标",
-    macroMap: "宏观数据映射",
-    composite: "综合指标",
-    compositeScore: "宏观综合评分",
-    currentRead: "当前判断：流动性正在改善，通胀压力仍然温和。增长企稳，但房地产仍是主要拖累项。",
-    axes: { growth: "增长", inflation: "通胀" },
-    table: ["代码", "行业", "价格", "涨跌", "评分", "市盈率", "增长", "RSI", "趋势"],
-    scores: {
-      growth: ["经济景气度", "PMI、固投、地产、失业率"],
-      liquidity: ["流动性", "M1、M2、社融、贷款、10年国债"],
-      inflation: ["通胀水平", "CPI 与 PPI 压力"],
-      external: ["外部压力", "USD/CNY 与外汇储备"],
-    },
-    factors: { momentum: "动量", quality: "质量", valuation: "估值", liquidity: "流动性", volatility: "波动率" },
-    sort: { score: "评分", growth: "增长", trend: "趋势" },
-    sectors: { Semis: "半导体", Software: "软件", Hardware: "硬件", Banks: "银行", Energy: "能源", Retail: "零售", Consumer: "消费", NewEnergy: "新能源", Auto: "汽车", Insurance: "保险", Healthcare: "医药", Internet: "互联网", Property: "地产" },
-    groups: { All: "全部", Growth: "增长", Liquidity: "流动性", Inflation: "通胀", Property: "地产", Rates: "利率", External: "外部" },
-    macro: {
-      PMI: "PMI",
-      M1: "M1",
-      M2: "M2",
-      "Social Financing": "社会融资规模",
-      "New Loans": "新增贷款",
-      CPI: "CPI",
-      PPI: "PPI",
-      "Fixed Asset Inv.": "固定资产投资",
-      "Home Sales Area": "房地产销售面积",
-      Unemployment: "失业率",
-      "FX Reserves": "外汇储备",
-      "CN 10Y Yield": "10年期国债收益率",
-      "USD/CNY": "USD/CNY 汇率",
-    },
-    cycles: { Recovery: "复苏", Overheat: "过热", Slowdown: "放缓", Stagflation: "滞胀" },
-  },
-};
-
-function clamp(value) {
-  return Math.max(0, Math.min(100, value));
-}
-
-function zScore(z, direction = 1) {
-  return clamp(Math.round(50 + z * direction * 18));
-}
-
-function weightedScore(items) {
-  const total = items.reduce((sum, item) => sum + item.weight, 0);
-  return Math.round(items.reduce((sum, item) => sum + zScore(item.z, item.direction) * item.weight, 0) / total);
-}
-
-function searchableText(...values) {
-  return values
-    .filter((value) => value !== undefined && value !== null)
-    .join(" ")
-    .toLowerCase();
-}
-
-function MiniBars({ values, tone = "cyan" }) {
-  return (
-    <div className={`mini-bars ${tone}`}>
-      {values.map((value, index) => (
-        <span key={index} style={{ height: `${value}%` }} />
-      ))}
-    </div>
-  );
-}
-
-function ScoreGauge({ label, value, caption }) {
-  return (
-    <section className="score-gauge">
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <div className="gauge-track">
-        <span style={{ width: `${value}%` }} />
-      </div>
-      <p>{caption}</p>
-    </section>
-  );
-}
+import { MiniBars } from "./components/MiniBars.jsx";
+import { ScoreGauge } from "./components/ScoreGauge.jsx";
+import { factorDefaults, macroInputs, macroTrend, spark, stocks } from "./data/mockData.js";
+import {
+  useMacroSnapshot,
+  useProviderHealth,
+  useRealtimeQuote,
+  useStockSearch,
+  useStockSnapshot,
+} from "./hooks/useMarketData.js";
+import { copy } from "./i18n/copy.js";
+import { searchableText, weightedScore, zScore } from "./utils/metrics.js";
 
 export function App() {
   const [lang, setLang] = useState("zh");
@@ -231,13 +40,11 @@ export function App() {
   const [indicator, setIndicator] = useState("Composite");
   const [factors, setFactors] = useState(factorDefaults);
   const [sortKey, setSortKey] = useState("score");
-  const [macroSnapshot, setMacroSnapshot] = useState(null);
-  const [stockSnapshot, setStockSnapshot] = useState(null);
-  const [searchSnapshot, setSearchSnapshot] = useState(null);
-  const [searchState, setSearchState] = useState("idle");
-  const [realtimeQuote, setRealtimeQuote] = useState(null);
-  const [realtimeState, setRealtimeState] = useState("idle");
+  const [showProviderDiag, setShowProviderDiag] = useState(false);
   const [activeNav, setActiveNav] = useState(0);
+  const macroSnapshot = useMacroSnapshot();
+  const stockSnapshot = useStockSnapshot();
+  const { searchSnapshot, searchState } = useStockSearch(query);
   const screenerRef = useRef(null);
   const macroRef = useRef(null);
   const chartRef = useRef(null);
@@ -288,106 +95,6 @@ export function App() {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    fetch(`${API_BASE_URL}/api/macro/snapshot`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Macro API returned ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((snapshot) => {
-        if (mounted) {
-          setMacroSnapshot(snapshot);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setMacroSnapshot(null);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const normalizedQuery = query.trim();
-    if (!normalizedQuery) {
-      setSearchSnapshot(null);
-      setSearchState("idle");
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    let retryTimer;
-    const timer = window.setTimeout(() => {
-      setSearchState("loading");
-      const runSearch = async (attempt = 0) => {
-        try {
-          const response = await fetch(`${API_BASE_URL}/api/stocks/search?q=${encodeURIComponent(normalizedQuery)}&limit=30`, {
-            signal: controller.signal,
-          });
-          if (!response.ok) {
-            throw new Error(`Stock search API returned ${response.status}`);
-          }
-          const snapshot = await response.json();
-          if (snapshot.warning && snapshot.stocks?.length === 0 && attempt === 0) {
-            retryTimer = window.setTimeout(() => runSearch(1), 800);
-            return;
-          }
-          setSearchSnapshot(snapshot);
-          setSearchState(snapshot.warning && snapshot.stocks?.length === 0 ? "error" : "ready");
-        } catch (error) {
-          if (error.name !== "AbortError") {
-            if (attempt === 0) {
-              retryTimer = window.setTimeout(() => runSearch(1), 800);
-            } else {
-              setSearchSnapshot({ stocks: [], warning: error.message });
-              setSearchState("error");
-            }
-          }
-        }
-      };
-      runSearch();
-    }, 350);
-
-    return () => {
-      window.clearTimeout(timer);
-      window.clearTimeout(retryTimer);
-      controller.abort();
-    };
-  }, [query]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    fetch(`${API_BASE_URL}/api/stocks/snapshot`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Stock API returned ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((snapshot) => {
-        if (mounted) {
-          setStockSnapshot(snapshot);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setStockSnapshot(null);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   const stockUniverse = useMemo(() => {
     if (stockSnapshot?.stocks?.length) {
       return stockSnapshot.stocks;
@@ -396,6 +103,14 @@ export function App() {
   }, [stockSnapshot]);
 
   const activeStockUniverse = query.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
+  const baseDetailStockUniverse = useMemo(() => {
+    const combined = [...stockUniverse, ...activeStockUniverse];
+    return [...new Map(combined.map((stock) => [stock.ticker, stock])).values()];
+  }, [activeStockUniverse, stockUniverse]);
+  const selectedStockBase = baseDetailStockUniverse.find((stock) => stock.ticker === selectedTicker) ?? baseDetailStockUniverse[0] ?? stocks[0];
+  const { realtimeQuote, realtimeMeta, realtimeState } = useRealtimeQuote(selectedStockBase);
+  const providerHealth = useProviderHealth(realtimeMeta?.updated_at);
+
   const displayedStockUniverse = useMemo(() => (
     activeStockUniverse.map((stock) => (
       realtimeQuote?.ticker === stock.ticker
@@ -427,58 +142,6 @@ export function App() {
   }, [macroSnapshot]);
 
   const selectedStock = detailStockUniverse.find((stock) => stock.ticker === selectedTicker) ?? detailStockUniverse[0] ?? stocks[0];
-
-  useEffect(() => {
-    const isAShare = ["SSE", "SZSE", "BSE", "A-share"].includes(selectedStock.exchange);
-    if (!isAShare || !/^\d{6}$/.test(selectedStock.ticker)) {
-      setRealtimeQuote(null);
-      setRealtimeState("idle");
-      return undefined;
-    }
-
-    let disposed = false;
-    let refreshTimer;
-    let controller;
-
-    const refreshRealtimeQuote = async () => {
-      let refreshAfterMs = 5000;
-      controller = new AbortController();
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/stocks/realtime?symbol=${encodeURIComponent(selectedStock.ticker)}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`Realtime API returned ${response.status}`);
-        }
-        const payload = await response.json();
-        refreshAfterMs = Math.max(5000, Number(payload.refresh_after_seconds ?? 5) * 1000);
-        if (!disposed && payload.quote) {
-          setRealtimeQuote(payload.quote);
-          setRealtimeState(payload.market_open === false ? "cached" : payload.stale ? "stale" : "live");
-        } else if (!disposed) {
-          setRealtimeState("stale");
-        }
-      } catch (error) {
-        if (!disposed && error.name !== "AbortError") {
-          setRealtimeState("stale");
-        }
-      } finally {
-        if (!disposed) {
-          refreshTimer = window.setTimeout(refreshRealtimeQuote, refreshAfterMs);
-        }
-      }
-    };
-
-    setRealtimeQuote(null);
-    setRealtimeState("loading");
-    refreshRealtimeQuote();
-
-    return () => {
-      disposed = true;
-      controller?.abort();
-      window.clearTimeout(refreshTimer);
-    };
-  }, [selectedStock.exchange, selectedStock.ticker]);
   const growthScore = macroSnapshot?.scores?.economic_climate ?? weightedScore(macroSeries.filter((item) => item.group === "Growth" || item.group === "Property"));
   const liquidityScore = macroSnapshot?.scores?.liquidity ?? weightedScore(macroSeries.filter((item) => item.group === "Liquidity" || item.group === "Rates"));
   const inflationScore = macroSnapshot?.scores?.inflation ?? weightedScore(macroSeries.filter((item) => item.group === "Inflation"));
@@ -539,13 +202,26 @@ export function App() {
     return matchesGroup && matchesQuery;
   });
   const macroSource = macroSnapshot?.source ?? "mock";
+  const activeProvider = realtimeQuote?.provider ?? realtimeMeta?.quote?.provider;
+  const marketStatusLabel = {
+    before_open: lang === "zh" ? "盘前" : "before open",
+    pre_market: lang === "zh" ? "集合竞价" : "pre-market",
+    open: lang === "zh" ? "交易中" : "open",
+    lunch_break: lang === "zh" ? "午休" : "lunch",
+    after_close: lang === "zh" ? "收盘后" : "after close",
+    weekend: lang === "zh" ? "周末" : "weekend",
+  }[realtimeMeta?.market_status] ?? (realtimeMeta?.market_open ? (lang === "zh" ? "交易中" : "open") : (lang === "zh" ? "休市" : "closed"));
+
   const stockSource = realtimeState === "live"
-    ? `akshare · realtime${realtimeQuote?.market_time ? ` · ${realtimeQuote.market_time}` : ""}`
+    ? `${activeProvider ?? "realtime"} · realtime${realtimeQuote?.market_time ? ` · ${realtimeQuote.market_time}` : ""}`
     : realtimeState === "cached"
-      ? `cache · market closed${realtimeQuote?.market_date ? ` · ${realtimeQuote.market_date}` : ""}`
-    : realtimeState === "stale"
-      ? "akshare · retrying"
-      : (query.trim() && searchSnapshot?.source) || stockSnapshot?.source || "mock";
+      ? `${activeProvider ?? "cache"} · ${marketStatusLabel}${realtimeQuote?.market_date ? ` · ${realtimeQuote.market_date}` : ""}`
+      : realtimeState === "stale"
+        ? `${activeProvider ?? "cache"} · ${lang === "zh" ? "缓存重试中" : "cache retry"}`
+        : (query.trim() && searchSnapshot?.source) || stockSnapshot?.source || "mock";
+
+  const providerDiag = realtimeMeta?.source_chain ?? [];
+  const activeProviderHealth = providerHealth?.providers?.find((item) => item.name === activeProvider);
 
   return (
     <main className="terminal">
@@ -645,13 +321,36 @@ export function App() {
               <div>
                 <small>{filteredStocks.length} {t.matches} · {stockSource}</small>
                 <h2>{t.ranked}</h2>
+                {(realtimeMeta?.warning || realtimeMeta?.notice) && (
+                  <p className="source-notice">{realtimeMeta.warning || realtimeMeta.notice}</p>
+                )}
               </div>
-              <div className="segmented">
-                {["score", "growth", "trend"].map((key) => (
-                  <button className={sortKey === key ? "selected" : ""} onClick={() => setSortKey(key)} key={key}>{t.sort[key]}</button>
-                ))}
+              <div className="table-actions">
+                {activeProvider && (
+                  <button
+                    type="button"
+                    className="ghost provider-status"
+                    onClick={() => setShowProviderDiag((value) => !value)}
+                  >
+                    {lang === "zh" ? "数据源" : "Provider"}: {activeProvider} {activeProviderHealth?.status === "cooldown" ? "⏸" : "✓"}
+                  </button>
+                )}
+                <div className="segmented">
+                  {["score", "growth", "trend"].map((key) => (
+                    <button className={sortKey === key ? "selected" : ""} onClick={() => setSortKey(key)} key={key}>{t.sort[key]}</button>
+                  ))}
+                </div>
               </div>
             </div>
+            {showProviderDiag && providerDiag.length > 0 && (
+              <div className="provider-diag" aria-live="polite">
+                {providerDiag.map((entry) => (
+                  <span key={`${entry.provider}-${entry.result}`}>
+                    {entry.provider} {entry.result} {entry.duration_ms}ms{entry.error ? ` · ${entry.error}` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
             <table>
               <thead>
                 <tr>
