@@ -15,6 +15,18 @@ def _number(value, default: float = 0) -> float:
         return default
 
 
+def _parse_market_timestamp(value: str | None) -> tuple[str | None, str | None]:
+    if not value:
+        return None, None
+    compact = value.strip()
+    if len(compact) >= 14 and compact[:14].isdigit():
+        return (
+            f"{compact[0:4]}-{compact[4:6]}-{compact[6:8]}",
+            f"{compact[8:10]}:{compact[10:12]}:{compact[12:14]}",
+        )
+    return None, None
+
+
 class TencentProvider(QuoteProvider):
     name = "tencent"
     priority = 3
@@ -43,6 +55,7 @@ class TencentProvider(QuoteProvider):
         amount = _number(fields[37]) if len(fields) > 37 else 0
         turnover = _number(fields[38]) if len(fields) > 38 else 0
         now = datetime.now(timezone.utc).isoformat()
+        market_date, market_time = _parse_market_timestamp(fields[30] if len(fields) > 30 else None)
         return UnifiedQuote(
             ticker=symbol,
             name=fields[1] or None,
@@ -57,7 +70,7 @@ class TencentProvider(QuoteProvider):
             turnover=round(turnover, 2),
             provider=self.name,
             source="realtime",
-            market_date=fields[30] if len(fields) > 30 else None,
-            market_time=fields[31] if len(fields) > 31 else None,
+            market_date=market_date,
+            market_time=market_time,
             fetched_at=now,
         )

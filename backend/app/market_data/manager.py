@@ -7,12 +7,13 @@ from threading import RLock
 
 from .cache import (
     read_memory_quote,
-    read_realtime_quote_file,
+    read_latest_realtime_quote,
+    read_today_realtime_quote,
     write_memory_quote,
     write_realtime_quote,
 )
 from .circuit_breaker import CircuitBreaker
-from .market_time import is_market_open, market_status
+from .market_time import current_trade_date, is_market_open, market_status
 from .providers import AkShareEastmoneyProvider, BaostockSnapshotProvider, SinaProvider, TencentProvider
 from .providers.base import QuoteProvider
 from .types import REALTIME_PROVIDER_PRIORITY, SourceChainEntry, UnifiedQuote
@@ -44,8 +45,14 @@ class MarketDataManager:
     def _normalize_symbol(self, symbol: str) -> str:
         return symbol.strip().lower().replace(".sh", "").replace(".sz", "").replace("sh.", "").replace("sz.", "")
 
-    def _quote_from_cache(self, symbol: str, provider_name: str, fallback_from: str | None = None) -> UnifiedQuote | None:
-        quote = read_realtime_quote_file(symbol)
+    def _quote_from_cache(
+        self,
+        symbol: str,
+        provider_name: str,
+        fallback_from: str | None = None,
+        today_only: bool = False,
+    ) -> UnifiedQuote | None:
+        quote = read_today_realtime_quote(symbol) if today_only else read_latest_realtime_quote(symbol)
         if not quote:
             return None
         quote.provider = provider_name
@@ -122,15 +129,32 @@ class MarketDataManager:
     def _closed_market_quote(self, symbol: str, now: datetime) -> dict:
         chain: list[SourceChainEntry] = []
         started = time.perf_counter()
-        quote = read_realtime_quote_file(symbol)
+        status = market_status(now)
+        prefer_today = status == "after_close"
+        quote = self._quote_from_cache(
+            symbol,
+            "today_realtime_cache" if prefer_today else "latest_realtime_cache",
+            today_only=prefer_today,
+        )
         chain.append(
             SourceChainEntry(
-                provider="realtime_cache",
+                provider="today_realtime_cache" if prefer_today else "latest_realtime_cache",
                 result="ok" if quote else "failed",
                 duration_ms=int((time.perf_counter() - started) * 1000),
-                error=None if quote else "no persisted realtime quote",
+                error=None if quote else ("no same-day realtime quote" if prefer_today else "no latest realtime quote"),
             )
         )
+        if not quote and prefer_today:
+            started = time.perf_counter()
+            quote = self._quote_from_cache(symbol, "latest_realtime_cache")
+            chain.append(
+                SourceChainEntry(
+                    provider="latest_realtime_cache",
+                    result="ok" if quote else "failed",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                    error=None if quote else "no latest realtime quote",
+                )
+            )
         if quote:
             quote.source = "cache"
             quote.is_stale = True
@@ -139,7 +163,7 @@ class MarketDataManager:
                 source="cache",
                 market_open=False,
                 source_chain=chain,
-                notice="非交易时段，显示最近缓存行情",
+                notice="非交易时段，显示当天最新缓存行情" if quote.market_date == current_trade_date(now) else "非交易时段，显示最近交易日缓存行情",
                 refresh_after_seconds=60,
             )
             write_memory_quote(symbol, result)
@@ -198,6 +222,8 @@ class MarketDataManager:
                 duration_ms = int((time.perf_counter() - started) * 1000)
                 if quote is None:
                     raise RuntimeError("provider returned empty quote")
+                if quote.market_date and quote.market_date != current_trade_date():
+                    raise RuntimeError(f"provider returned stale quote date {quote.market_date}")
                 self.circuit_breaker.record_success(provider_name)
                 chain.append(SourceChainEntry(provider=provider_name, result="ok", duration_ms=duration_ms))
                 quote.fetched_at = datetime.now(timezone.utc).isoformat()
@@ -219,22 +245,33 @@ class MarketDataManager:
                 chain.append(SourceChainEntry(provider=provider_name, result="failed", duration_ms=duration_ms, error=message))
 
         started = time.perf_counter()
-        cached = self._quote_from_cache(symbol, "realtime_cache", fallback_from=last_error)
+        cached = self._quote_from_cache(symbol, "today_realtime_cache", fallback_from=last_error, today_only=True)
         chain.append(
             SourceChainEntry(
-                provider="realtime_cache",
+                provider="today_realtime_cache",
                 result="ok" if cached else "failed",
                 duration_ms=int((time.perf_counter() - started) * 1000),
-                error=None if cached else "no persisted realtime quote",
+                error=None if cached else "no same-day realtime quote",
             )
         )
+        if not cached:
+            started = time.perf_counter()
+            cached = self._quote_from_cache(symbol, "latest_realtime_cache", fallback_from=last_error)
+            chain.append(
+                SourceChainEntry(
+                    provider="latest_realtime_cache",
+                    result="ok" if cached else "failed",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                    error=None if cached else "no latest realtime quote",
+                )
+            )
         if cached:
             result = self._build_response(
                 quote=cached,
                 source="cache",
                 market_open=True,
                 source_chain=chain,
-                warning="实时源暂不可用，已显示最近缓存行情",
+                warning="实时源暂不可用，已显示当天缓存行情" if cached.provider == "today_realtime_cache" else "实时源暂不可用，已显示最近交易日缓存行情",
                 stale=True,
                 refresh_after_seconds=15,
             )

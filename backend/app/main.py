@@ -7,6 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import CORS_ORIGINS
 from .indicators import INDICATORS
+from .market_data.refresher import (
+    quote_cache_refresher_status,
+    start_quote_cache_refresher,
+    stop_quote_cache_refresher,
+)
 from .service import get_macro_snapshot, refresh_macro_snapshot
 from .stocks import (
     fetch_stock_snapshot,
@@ -32,6 +37,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def start_background_workers() -> None:
+    start_quote_cache_refresher()
+
+
+@app.on_event("shutdown")
+def stop_background_workers() -> None:
+    stop_quote_cache_refresher()
 
 
 @app.get("/health")
@@ -109,3 +124,8 @@ def stocks_providers_health() -> Dict[str, Any]:
 @app.get("/api/stocks/cache/status")
 def stocks_cache_status_endpoint() -> Dict[str, Any]:
     return stocks_cache_status()
+
+
+@app.get("/api/stocks/cache/refresher")
+def stocks_cache_refresher_endpoint() -> Dict[str, Any]:
+    return quote_cache_refresher_status()

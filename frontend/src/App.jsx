@@ -30,6 +30,7 @@ import {
 } from "./hooks/useMarketData.js";
 import { copy } from "./i18n/copy.js";
 import { searchableText, weightedScore, zScore } from "./utils/metrics.js";
+import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
 
 export function App() {
   const [lang, setLang] = useState("zh");
@@ -222,6 +223,27 @@ export function App() {
 
   const providerDiag = realtimeMeta?.source_chain ?? [];
   const activeProviderHealth = providerHealth?.providers?.find((item) => item.name === activeProvider);
+  const handleExportReport = () => {
+    const markdown = buildMarkdownReport({
+      lang,
+      t,
+      selectedStock,
+      filteredStocks,
+      macroScores: {
+        growth: growthScore,
+        liquidity: liquidityScore,
+        inflation: inflationScore,
+        external: externalScore,
+      },
+      cycle,
+      macroSeries,
+      stockSource,
+      macroSource,
+      realtimeMeta,
+      providerDiag,
+    });
+    downloadMarkdownReport(markdown, selectedStock);
+  };
 
   return (
     <main className="terminal">
@@ -279,7 +301,7 @@ export function App() {
             <button className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>EN</button>
           </div>
           <button className="icon-button" aria-label="Alerts"><Bell size={18} /></button>
-          <button className="primary" ref={reportRef}><Download size={16} /> {t.export}</button>
+          <button className="primary" ref={reportRef} onClick={handleExportReport}><Download size={16} /> {t.export}</button>
         </header>
 
         <div className="content-grid">
