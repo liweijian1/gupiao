@@ -17,3 +17,28 @@ export function searchableText(...values) {
     .join(" ")
     .toLowerCase();
 }
+
+export function filterMacroSeries(
+  items,
+  { group = "All", query = "", macroLabels = {}, groupLabels = {} } = {},
+) {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  return items.filter((item) => {
+    const matchesGroup = group === "All" || item.group === group;
+    const matchesQuery =
+      normalizedQuery.length === 0 ||
+      searchableText(
+        item.key,
+        macroLabels[item.key],
+        item.group,
+        groupLabels[item.group],
+        item.api,
+        item.value,
+        item.score,
+        item.source,
+      ).includes(normalizedQuery);
+
+    return matchesGroup && matchesQuery;
+  });
+}
