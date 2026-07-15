@@ -29,12 +29,13 @@ import {
   useStockSnapshot,
 } from "./hooks/useMarketData.js";
 import { copy } from "./i18n/copy.js";
-import { searchableText, weightedScore, zScore } from "./utils/metrics.js";
+import { filterMacroSeries, searchableText, weightedScore, zScore } from "./utils/metrics.js";
 import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
 
 export function App() {
   const [lang, setLang] = useState("zh");
-  const [query, setQuery] = useState("");
+  const [stockQuery, setStockQuery] = useState("");
+  const [macroQuery, setMacroQuery] = useState("");
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [activeGroup, setActiveGroup] = useState("All");
   const [timeframe, setTimeframe] = useState("12M");
@@ -45,7 +46,7 @@ export function App() {
   const [activeNav, setActiveNav] = useState(0);
   const macroSnapshot = useMacroSnapshot();
   const stockSnapshot = useStockSnapshot();
-  const { searchSnapshot, searchState } = useStockSearch(query);
+  const { searchSnapshot, searchState } = useStockSearch(stockQuery);
   const screenerRef = useRef(null);
   const macroRef = useRef(null);
   const chartRef = useRef(null);
@@ -103,7 +104,7 @@ export function App() {
     return stocks;
   }, [stockSnapshot]);
 
-  const activeStockUniverse = query.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
+  const activeStockUniverse = stockQuery.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
   const baseDetailStockUniverse = useMemo(() => {
     const combined = [...stockUniverse, ...activeStockUniverse];
     return [...new Map(combined.map((stock) => [stock.ticker, stock])).values()];
@@ -150,7 +151,7 @@ export function App() {
   const cycle = macroSnapshot?.scores?.cycle ?? (growthScore > 58 && inflationScore < 55 ? "Recovery" : growthScore > 60 && inflationScore >= 55 ? "Overheat" : growthScore < 48 && inflationScore > 55 ? "Stagflation" : "Slowdown");
 
   const filteredStocks = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = stockQuery.trim().toLowerCase();
     return displayedStockUniverse
       .filter((stock) => {
         const matchesQuery =
@@ -176,32 +177,21 @@ export function App() {
         return matchesQuery && (normalizedQuery.length > 0 || factorGate);
       })
       .sort((a, b) => b[sortKey] - a[sortKey]);
-  }, [query, factors, sortKey, displayedStockUniverse, t.sectors]);
+  }, [stockQuery, factors, sortKey, displayedStockUniverse, t.sectors]);
 
   useEffect(() => {
-    if (query.trim().length > 0 && filteredStocks.length > 0) {
+    if (stockQuery.trim().length > 0 && filteredStocks.length > 0) {
       setSelectedTicker(filteredStocks[0].ticker);
     }
-  }, [filteredStocks, query]);
+  }, [filteredStocks, stockQuery]);
 
   const macroGroups = ["All", "Growth", "Liquidity", "Inflation", "Property", "Rates", "External"];
-  const visibleMacro = macroSeries.filter((item) => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const matchesGroup = activeGroup === "All" || item.group === activeGroup;
-    const matchesQuery =
-      normalizedQuery.length === 0 ||
-      searchableText(
-        item.key,
-        t.macro[item.key],
-        item.group,
-        t.groups[item.group],
-        item.api,
-        item.value,
-        item.score,
-        item.source,
-      ).includes(normalizedQuery);
-    return matchesGroup && matchesQuery;
-  });
+  const visibleMacro = useMemo(() => filterMacroSeries(macroSeries, {
+    group: activeGroup,
+    query: macroQuery,
+    macroLabels: t.macro,
+    groupLabels: t.groups,
+  }), [activeGroup, macroQuery, macroSeries, t.groups, t.macro]);
   const macroSource = macroSnapshot?.source ?? "mock";
   const activeProvider = realtimeQuote?.provider ?? realtimeMeta?.quote?.provider;
   const marketStatusLabel = {
@@ -219,7 +209,7 @@ export function App() {
       ? `${activeProvider ?? "cache"} · ${marketStatusLabel}${realtimeQuote?.market_date ? ` · ${realtimeQuote.market_date}` : ""}`
       : realtimeState === "stale"
         ? `${activeProvider ?? "cache"} · ${lang === "zh" ? "缓存重试中" : "cache retry"}`
-        : (query.trim() && searchSnapshot?.source) || stockSnapshot?.source || "mock";
+        : (stockQuery.trim() && searchSnapshot?.source) || stockSnapshot?.source || "mock";
 
   const providerDiag = realtimeMeta?.source_chain ?? [];
   const activeProviderHealth = providerHealth?.providers?.find((item) => item.name === activeProvider);
@@ -287,7 +277,7 @@ export function App() {
         <header className="topbar">
           <div className="searchbox">
             <Search size={18} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.search} />
+            <input value={stockQuery} onChange={(event) => setStockQuery(event.target.value)} placeholder={t.search} />
           </div>
           <div className="market-strip">
             <span>CSI 300 <b className="up">+0.42%</b></span>
@@ -480,13 +470,27 @@ export function App() {
                 <small>{t.macroSeries}</small>
                 <h2>{t.macroMap}</h2>
               </div>
-              <div className="segmented scroll">
-                {macroGroups.map((group) => (
-                  <button className={activeGroup === group ? "selected" : ""} onClick={() => setActiveGroup(group)} key={group}>{t.groups[group]}</button>
-                ))}
+              <div className="macro-table-tools">
+                <label className="macro-search">
+                  <Search size={15} />
+                  <input
+                    value={macroQuery}
+                    onChange={(event) => setMacroQuery(event.target.value)}
+                    placeholder={t.macroSearch}
+                    aria-label={t.macroSearch}
+                  />
+                </label>
+                <div className="segmented scroll">
+                  {macroGroups.map((group) => (
+                    <button className={activeGroup === group ? "selected" : ""} onClick={() => setActiveGroup(group)} key={group}>{t.groups[group]}</button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="macro-list">
+              {visibleMacro.length === 0 && (
+                <p className="macro-empty" aria-live="polite">{t.noMacroMatches}</p>
+              )}
               {visibleMacro.map((item) => (
                 <button className="macro-row" onClick={() => setIndicator(item.key)} key={item.key}>
                   <span>

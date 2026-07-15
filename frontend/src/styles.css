@@ -662,6 +662,38 @@ tbody tr:hover,
   flex-direction: column;
 }
 
+.macro-table-tools {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.macro-search {
+  width: min(210px, 28vw);
+  min-width: 150px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #27323a;
+  border-radius: 8px;
+  background: #0b1115;
+  color: #75838d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.macro-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #dce5ea;
+  font: inherit;
+}
+
 .segmented.scroll {
   max-width: 430px;
   overflow: auto;
@@ -669,6 +701,15 @@ tbody tr:hover,
 
 .macro-list {
   overflow: auto;
+}
+
+.macro-empty {
+  min-height: 116px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: #75838d;
+  font-size: 13px;
 }
 
 .macro-row {
@@ -813,6 +854,16 @@ tbody tr:hover,
 
   .macro-panel {
     grid-column: auto;
+  }
+
+  .macro-table .panel-title,
+  .macro-table-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .macro-search {
+    width: 100%;
   }
 
   .panel {
