@@ -5,6 +5,7 @@ from typing import Any, Dict
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from .ai.routes import router as ai_router
 from .config import CORS_ORIGINS
 from .indicators import INDICATORS
 from .market_data.refresher import (
@@ -37,6 +38,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(ai_router)
 
 
 @app.on_event("startup")

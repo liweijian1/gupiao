@@ -7,6 +7,8 @@
 - **宏观实验室**：PMI、M1/M2、社融、CPI/PPI 等 13 项中国宏观序列，归一化后计算综合评分
 - **量化筛选**：多因子打分、排序、搜索，支持 A 股 / 港股 / 美股示例池
 - **数据管道**：本地缓存快照，支持手动刷新；AkShare 不可用时自动降级为 mock 数据
+- **AI 股票分析**：使用当前股票、量化因子和宏观快照生成结构化研究摘要、评级与建议仓位，并按股票和语言缓存最近结果
+- **安全 AI 配置**：支持 OpenAI 兼容的 Base URL、模型与 API Key；配置管理和分析访问使用两套独立密码
 - **双语界面**：中英文切换
 
 ## 技术栈
@@ -54,6 +56,17 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 未安装 AkShare 时 API 仍可运行，返回 `source: "mock"` 的降级数据。
 
+如需启用 AI 设置与分析接口，启动后端前配置两套不同用途的密码：
+
+```bash
+export AI_ADMIN_PASSWORD='<administrator configuration password>'
+export AI_ANALYSIS_PASSWORD='<separate analysis access password>'
+export AI_CONFIG_PATH='./data/cache/ai_config.json'
+export AI_ANALYSIS_CACHE_DIR='./data/cache/ai_analysis'
+```
+
+`AI_ADMIN_PASSWORD` 只用于测试和保存 AI 服务配置，`AI_ANALYSIS_PASSWORD` 只用于读取或生成股票分析。任一密码为空时对应接口都会拒绝访问。API Key 由后端以 `0600` 权限写入 `AI_CONFIG_PATH`，不会写入 Git、浏览器存储或前端静态资源。
+
 ### 2. 启动前端
 
 ```bash
@@ -99,6 +112,20 @@ npm run preview
 | GET | `/api/stocks/search?q=` | 搜索股票 |
 | GET | `/api/stocks/quote?symbol=` | 单只报价 |
 | POST | `/api/stocks/refresh` | 刷新股票缓存 |
+
+### AI 分析
+
+AI 服务使用 OpenAI 兼容的 `POST {Base URL}/chat/completions` 协议。Base URL 应包含 API 版本前缀，例如 `https://api.openai.com/v1`；非本机地址必须使用 HTTPS。
+
+| 方法 | 路径 | 保护方式 | 说明 |
+|------|------|----------|------|
+| GET | `/api/ai/config/status` | 无 | 仅返回服务地址、模型和脱敏后的 Key 状态 |
+| POST | `/api/ai/config/test` | `X-AI-Admin-Password` | 测试候选配置，不保存 |
+| PUT | `/api/ai/config` | `X-AI-Admin-Password` | 原子保存服务配置 |
+| POST | `/api/ai/analyze` | `X-AI-Analysis-Password` | 分析当前股票；`force: true` 强制重新生成 |
+| GET | `/api/ai/analysis/{ticker}?lang=zh` | `X-AI-Analysis-Password` | 读取当前配置对应的最近缓存 |
+
+AI 只使用后端提供的股票快照、因子和宏观数据，不读取新闻，也不会生成目标价。结果仅供研究参考，不构成投资建议。
 
 API 文档：http://127.0.0.1:8000/docs
 

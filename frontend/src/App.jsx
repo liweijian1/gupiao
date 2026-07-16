@@ -13,6 +13,7 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
+  Sparkles,
   Target,
   TrendingDown,
   TrendingUp,
@@ -20,6 +21,8 @@ import {
 
 import { MiniBars } from "./components/MiniBars.jsx";
 import { ScoreGauge } from "./components/ScoreGauge.jsx";
+import { AiAnalysisPanel } from "./components/AiAnalysisPanel.jsx";
+import { AiSettingsDialog } from "./components/AiSettingsDialog.jsx";
 import { factorDefaults, macroInputs, macroTrend, spark, stocks } from "./data/mockData.js";
 import {
   useMacroSnapshot,
@@ -28,6 +31,7 @@ import {
   useStockSearch,
   useStockSnapshot,
 } from "./hooks/useMarketData.js";
+import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
 import { copy } from "./i18n/copy.js";
 import { filterMacroSeries, searchableText, weightedScore, zScore } from "./utils/metrics.js";
 import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
@@ -43,6 +47,10 @@ export function App() {
   const [factors, setFactors] = useState(factorDefaults);
   const [sortKey, setSortKey] = useState("score");
   const [showProviderDiag, setShowProviderDiag] = useState(false);
+  const [showAiSettings, setShowAiSettings] = useState(false);
+  const [showAnalysisPassword, setShowAnalysisPassword] = useState(false);
+  const [analysisPassword, setAnalysisPassword] = useState("");
+  const [pendingAnalysisForce, setPendingAnalysisForce] = useState(null);
   const [activeNav, setActiveNav] = useState(0);
   const macroSnapshot = useMacroSnapshot();
   const stockSnapshot = useStockSnapshot();
@@ -144,6 +152,7 @@ export function App() {
   }, [macroSnapshot]);
 
   const selectedStock = detailStockUniverse.find((stock) => stock.ticker === selectedTicker) ?? detailStockUniverse[0] ?? stocks[0];
+  const aiAnalysis = useAiAnalysis({ ticker: selectedStock.ticker, lang, analysisPassword });
   const growthScore = macroSnapshot?.scores?.economic_climate ?? weightedScore(macroSeries.filter((item) => item.group === "Growth" || item.group === "Property"));
   const liquidityScore = macroSnapshot?.scores?.liquidity ?? weightedScore(macroSeries.filter((item) => item.group === "Liquidity" || item.group === "Rates"));
   const inflationScore = macroSnapshot?.scores?.inflation ?? weightedScore(macroSeries.filter((item) => item.group === "Inflation"));
@@ -213,6 +222,33 @@ export function App() {
 
   const providerDiag = realtimeMeta?.source_chain ?? [];
   const activeProviderHealth = providerHealth?.providers?.find((item) => item.name === activeProvider);
+  const requestAnalysis = (force = false) => {
+    if (!analysisPassword) {
+      setPendingAnalysisForce(force);
+      setShowAnalysisPassword(true);
+      return;
+    }
+    aiAnalysis.run({ force });
+  };
+
+  useEffect(() => {
+    if (pendingAnalysisForce === null || !analysisPassword) return;
+    const force = pendingAnalysisForce;
+    setPendingAnalysisForce(null);
+    aiAnalysis.run({ force });
+  }, [analysisPassword, pendingAnalysisForce, aiAnalysis.run]);
+
+  useEffect(() => {
+    if (aiAnalysis.error?.status === 401 && aiAnalysis.error?.code === "invalid_analysis_password") {
+      setAnalysisPassword("");
+      setPendingAnalysisForce(false);
+      setShowAnalysisPassword(true);
+    }
+    if (aiAnalysis.error?.code === "ai_not_configured") {
+      setShowAiSettings(true);
+    }
+  }, [aiAnalysis.error]);
+
   const handleExportReport = () => {
     const markdown = buildMarkdownReport({
       lang,
@@ -285,8 +321,10 @@ export function App() {
             <span>CN10Y <b>1.72%</b></span>
             <span>USD/CNY <b>7.18</b></span>
           </div>
+          <button type="button" className="icon-button ai-settings-button" aria-label={t.ai.settings} onClick={() => setShowAiSettings(true)}>
+            <Settings2 size={16} />
+          </button>
           <div className="segmented language-toggle" aria-label="Language selector">
-            <Settings2 size={14} />
             <button className={lang === "zh" ? "selected" : ""} onClick={() => setLang("zh")}>中</button>
             <button className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>EN</button>
           </div>
@@ -404,7 +442,12 @@ export function App() {
                 <small>{t.selectedEquity}</small>
                 <h2>{selectedStock.ticker} · {selectedStock.name}</h2>
               </div>
-              <Target size={18} />
+              <div className="detail-title-actions">
+                <button type="button" className="ghost" onClick={() => requestAnalysis(false)}>
+                  <Sparkles size={14} /> {t.ai.analysis}
+                </button>
+                <Target size={18} />
+              </div>
             </div>
             <div className="price-line">
               <strong>{selectedStock.currency}{selectedStock.price.toFixed(2)}</strong>
@@ -427,6 +470,22 @@ export function App() {
               <span>{t.factors.liquidity} <b>{selectedStock.liquidity}</b></span>
               <span>{t.factors.momentum} <b>{selectedStock.trend}</b></span>
             </div>
+            <AiAnalysisPanel
+              t={t}
+              ticker={selectedStock.ticker}
+              status={aiAnalysis.status}
+              result={aiAnalysis.result}
+              error={aiAnalysis.error}
+              needsPassword={showAnalysisPassword || aiAnalysis.needsPassword}
+              onAnalyze={() => requestAnalysis(false)}
+              onRefresh={() => requestAnalysis(true)}
+              onSubmitPassword={(password) => {
+                setAnalysisPassword(password);
+                setShowAnalysisPassword(false);
+                if (pendingAnalysisForce === null) setPendingAnalysisForce(false);
+              }}
+              onOpenSettings={() => setShowAiSettings(true)}
+            />
           </section>
 
           <section className="panel macro-panel nav-target" ref={macroRef}>
@@ -505,6 +564,12 @@ export function App() {
           </section>
         </div>
       </section>
+      <AiSettingsDialog
+        open={showAiSettings}
+        onClose={() => setShowAiSettings(false)}
+        onSaved={() => setShowAiSettings(false)}
+        t={t}
+      />
     </main>
   );
 }
