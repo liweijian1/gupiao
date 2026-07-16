@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { copy as appCopy } from "../i18n/copy.js";
 import {
   AiPdfExportError,
   buildAiPdfDocument,
@@ -273,6 +274,26 @@ test("footer identifies the ticker and page count", () => {
 
   assert.match(footerText, /600000/);
   assert.match(footerText, /第 2 \/ 5 页/);
+});
+
+test("uses the application bilingual report copy", () => {
+  const chinese = buildAiPdfDocument({
+    lang: "zh",
+    t: appCopy.zh,
+    selectedStock,
+    result,
+    exportedAt: new Date("2026-07-16T04:00:00Z"),
+  });
+  const english = buildAiPdfDocument({
+    lang: "en",
+    t: appCopy.en,
+    selectedStock,
+    result,
+    exportedAt: new Date("2026-07-16T04:00:00Z"),
+  });
+
+  assert.match(flattenStrings(chinese).join("\n"), /AI 股票分析报告/);
+  assert.match(flattenStrings(english).join("\n"), /AI Equity Analysis Report/);
 });
 
 test("loads pdfmake lazily and reuses font registration", async () => {
