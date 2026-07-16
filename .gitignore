@@ -1,4 +1,5 @@
 .DS_Store
+.worktrees/
 
 # Python
 __pycache__/
