@@ -1,5 +1,36 @@
 const FONT_FAMILY = "NotoSansSC";
 const MISSING_VALUE = "--";
+const FONT_URL = new URL("../assets/fonts/NotoSansSC-Variable.ttf", import.meta.url).href;
+const enginePromises = new WeakMap();
+const registeredEngines = new WeakSet();
+
+
+async function defaultLoadPdfMake() {
+  const module = await import("pdfmake/build/pdfmake.js");
+  return module.default ?? module;
+}
+
+async function loadEngine(loader) {
+  let promise = enginePromises.get(loader);
+  if (!promise) {
+    promise = Promise.resolve()
+      .then(() => loader())
+      .catch((error) => {
+        enginePromises.delete(loader);
+        throw error;
+      });
+    enginePromises.set(loader, promise);
+  }
+  return promise;
+}
+
+export class AiPdfExportError extends Error {
+  constructor() {
+    super("AI PDF export failed");
+    this.name = "AiPdfExportError";
+    this.code = "ai_pdf_export_failed";
+  }
+}
 
 
 function isMissing(value) {
@@ -197,4 +228,40 @@ export function buildAiPdfDocument({
       disclaimer: { fontSize: 8.5, color: "#64748b", italics: true },
     },
   };
+}
+
+export async function downloadAiAnalysisPdf(snapshot, dependencies = {}) {
+  const loadPdfMake = dependencies.loadPdfMake ?? defaultLoadPdfMake;
+  const fontUrl = dependencies.fontUrl ?? FONT_URL;
+  const exportedAt = snapshot.exportedAt ?? new Date();
+
+  try {
+    const engine = await loadEngine(loadPdfMake);
+    if (!registeredEngines.has(engine)) {
+      engine.addFonts({
+        [FONT_FAMILY]: {
+          normal: fontUrl,
+          bold: fontUrl,
+          italics: fontUrl,
+          bolditalics: fontUrl,
+        },
+      });
+      registeredEngines.add(engine);
+    }
+    const document = buildAiPdfDocument({
+      lang: snapshot.lang,
+      t: snapshot.t,
+      selectedStock: snapshot.selectedStock,
+      result: snapshot.result,
+      exportedAt,
+    });
+    const filename = buildAiPdfFilename({
+      lang: snapshot.lang,
+      ticker: snapshot.selectedStock?.ticker,
+      date: exportedAt,
+    });
+    await engine.createPdf(document).download(filename);
+  } catch {
+    throw new AiPdfExportError();
+  }
 }

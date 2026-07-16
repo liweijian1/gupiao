@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  AiPdfExportError,
   buildAiPdfDocument,
   buildAiPdfFilename,
+  downloadAiAnalysisPdf,
 } from "./aiPdfReport.js";
 
 
@@ -271,4 +273,92 @@ test("footer identifies the ticker and page count", () => {
 
   assert.match(footerText, /600000/);
   assert.match(footerText, /第 2 \/ 5 页/);
+});
+
+test("loads pdfmake lazily and reuses font registration", async () => {
+  let loadCalls = 0;
+  const registeredFonts = [];
+  const downloads = [];
+  const definitions = [];
+  const engine = {
+    addFonts(fonts) {
+      registeredFonts.push(fonts);
+    },
+    createPdf(document) {
+      definitions.push(document);
+      return {
+        async download(filename) {
+          downloads.push(filename);
+        },
+      };
+    },
+  };
+  const loadPdfMake = async () => {
+    loadCalls += 1;
+    return engine;
+  };
+  const snapshot = {
+    lang: "zh",
+    t: copy.zh,
+    selectedStock,
+    result,
+    exportedAt: new Date("2026-07-16T04:00:00Z"),
+  };
+
+  assert.equal(loadCalls, 0);
+  await downloadAiAnalysisPdf(snapshot, { loadPdfMake, fontUrl: "/stock-macro/assets/noto.ttf" });
+  await downloadAiAnalysisPdf(snapshot, { loadPdfMake, fontUrl: "/stock-macro/assets/noto.ttf" });
+
+  assert.equal(loadCalls, 1);
+  assert.equal(registeredFonts.length, 1);
+  assert.deepEqual(registeredFonts[0].NotoSansSC, {
+    normal: "/stock-macro/assets/noto.ttf",
+    bold: "/stock-macro/assets/noto.ttf",
+    italics: "/stock-macro/assets/noto.ttf",
+    bolditalics: "/stock-macro/assets/noto.ttf",
+  });
+  assert.equal(definitions.length, 2);
+  assert.deepEqual(downloads, [
+    "600000-AI分析报告-2026-07-16.pdf",
+    "600000-AI分析报告-2026-07-16.pdf",
+  ]);
+});
+
+test("sanitizes loader, font, render, and download failures", async () => {
+  const privateValue = "sk-never-expose-this";
+  const snapshot = {
+    lang: "en",
+    t: copy.en,
+    selectedStock: { ...selectedStock, api_key: privateValue },
+    result: { ...result, reasoning: privateValue },
+    exportedAt: new Date("2026-07-16T04:00:00Z"),
+  };
+  const failureLoaders = [
+    async () => { throw new Error(`loader ${privateValue}`); },
+    async () => ({
+      addFonts() { throw new Error(`font ${privateValue}`); },
+    }),
+    async () => ({
+      addFonts() {},
+      createPdf() { throw new Error(`render ${privateValue}`); },
+    }),
+    async () => ({
+      addFonts() {},
+      createPdf() {
+        return { download: async () => { throw new Error(`download ${privateValue}`); } };
+      },
+    }),
+  ];
+
+  for (const loadPdfMake of failureLoaders) {
+    await assert.rejects(
+      downloadAiAnalysisPdf(snapshot, { loadPdfMake, fontUrl: "/font.ttf" }),
+      (error) => {
+        assert.equal(error instanceof AiPdfExportError, true);
+        assert.equal(error.code, "ai_pdf_export_failed");
+        assert.equal(error.message.includes(privateValue), false);
+        return true;
+      },
+    );
+  }
 });
