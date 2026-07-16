@@ -54,3 +54,26 @@ def test_rejects_invalid_model_output_without_leaking_body():
         client.analyze(CONFIG, [{"role": "user", "content": "context"}])
     assert caught.value.code == "invalid_ai_response"
     assert "sk-secret" not in str(caught.value)
+
+
+def test_accepts_json_after_minimax_thinking_block_and_code_fence():
+    content = """<think>private reasoning</think>
+```json
+{
+  "rating": "bullish",
+  "position_range": {"min": 20, "max": 35},
+  "summary": "summary",
+  "opportunities": ["opportunity"],
+  "risks": ["risk"],
+  "watchlist": [{"name": "PMI", "value": "50", "reason": "reason"}],
+  "disclaimer": "reference only"
+}
+```"""
+    client = client_for(lambda request: httpx.Response(200, json={
+        "choices": [{"message": {"content": content}}]
+    }))
+
+    result = client.analyze(CONFIG, [{"role": "user", "content": "context"}])
+
+    assert result.rating == "bullish"
+    assert result.position_range.max == 35
