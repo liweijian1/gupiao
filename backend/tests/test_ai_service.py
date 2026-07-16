@@ -5,7 +5,8 @@ import pytest
 from app.ai.cache import AiAnalysisCache
 from app.ai.client import AiUpstreamError
 from app.ai.models import AiAnalysis, AiProviderConfig
-from app.ai.service import AiAnalysisService
+from app.ai import service as ai_service_module
+from app.ai.service import AiAnalysisService, load_analysis_context
 
 
 class FakeStore:
@@ -94,3 +95,46 @@ def test_cache_contains_no_secrets(service, cache_dir):
     assert "analysis-password" not in content
     payload = json.loads(content)
     assert payload["analysis"]["disclaimer"] == "仅供研究参考，不构成投资建议。"
+
+
+def test_context_resolves_dynamic_stock_missing_from_snapshot(monkeypatch):
+    quote_calls = []
+    monkeypatch.setattr(ai_service_module, "get_stock_snapshot", lambda: {
+        "stocks": [],
+        "updated_at": "2026-07-15T08:00:00+00:00",
+    })
+    monkeypatch.setattr(ai_service_module, "stock_quote", lambda ticker: (
+        quote_calls.append(ticker) or {
+            "stock": {
+                "ticker": "600000",
+                "name": "浦发银行",
+                "exchange": "SSE",
+                "sector": "Banks",
+                "currency": "¥",
+                "price": 9.31,
+                "chg": 1.64,
+                "score": 46,
+                "pe": 6.17,
+                "growth": -16.28,
+                "rsi": 55,
+                "beta": 1.0,
+                "trend": 27,
+                "liquidity": 37,
+                "source": "baostock",
+            },
+            "updated_at": "2026-07-16T02:37:28+00:00",
+        }
+    ))
+    monkeypatch.setattr(ai_service_module, "get_macro_snapshot", lambda: {
+        "scores": {"cycle": "Recovery"},
+        "series": [],
+        "source": "mock",
+        "updated_at": "2026-07-16T01:00:00+00:00",
+    })
+
+    context = load_analysis_context("600000")
+
+    assert quote_calls == ["600000"]
+    assert context["stock"]["ticker"] == "600000"
+    assert context["stock"]["price"] == 9.31
+    assert context["data_as_of"] == "2026-07-16T02:37:28+00:00"
