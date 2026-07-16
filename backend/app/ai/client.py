@@ -10,6 +10,22 @@ from ..config import AI_CONNECT_TIMEOUT_SECONDS, AI_RESPONSE_TIMEOUT_SECONDS
 from .models import AiAnalysis, AiProviderConfig
 
 
+def _structured_content(value: str) -> str:
+    content = value.strip()
+    if content.startswith("<think>"):
+        closing_tag = content.find("</think>")
+        if closing_tag < 0:
+            raise ValueError("unterminated thinking block")
+        content = content[closing_tag + len("</think>"):].strip()
+    if content.startswith("```"):
+        lines = content.splitlines()
+        opening = lines[0].strip().lower()
+        if opening not in {"```", "```json"} or len(lines) < 3 or lines[-1].strip() != "```":
+            raise ValueError("invalid JSON code fence")
+        content = "\n".join(lines[1:-1]).strip()
+    return content
+
+
 class AiUpstreamError(RuntimeError):
     def __init__(self, code: str, status_code: int, retry_after: int | None = None):
         super().__init__(code)
@@ -72,6 +88,6 @@ class OpenAiCompatibleClient:
         self._raise_status(response)
         try:
             content = response.json()["choices"][0]["message"]["content"]
-            return AiAnalysis.model_validate(json.loads(content))
+            return AiAnalysis.model_validate(json.loads(_structured_content(content)))
         except (KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
             raise AiUpstreamError("invalid_ai_response", 502) from exc

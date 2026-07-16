@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 
 from ..service import get_macro_snapshot
-from ..stocks import get_stock_snapshot
+from ..stocks import get_stock_snapshot, stock_quote
 
 
 DISCLAIMERS = {
@@ -40,8 +40,13 @@ def load_analysis_context(ticker: str) -> dict:
         (item for item in stock_snapshot.get("stocks", []) if str(item.get("ticker", "")).upper() == normalized),
         None,
     )
+    stock_updated_at = stock_snapshot.get("updated_at")
     if stock is None:
-        raise ValueError("stock_not_found")
+        quote = stock_quote(normalized)
+        stock = quote.get("stock")
+        stock_updated_at = quote.get("updated_at") or stock_updated_at
+        if stock is None:
+            raise ValueError("stock_not_found")
     macro = get_macro_snapshot()
     scores = macro.get("scores", {})
     series = [
@@ -72,7 +77,7 @@ def load_analysis_context(ticker: str) -> dict:
             "source": macro.get("source"),
         },
         "data_as_of": max(
-            str(stock_snapshot.get("updated_at") or ""),
+            str(stock_updated_at or ""),
             str(macro.get("updated_at") or ""),
         ),
     }
