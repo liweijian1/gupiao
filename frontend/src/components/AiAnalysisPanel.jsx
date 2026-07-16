@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { LoaderCircle, RefreshCcw, Settings2, Sparkles } from "lucide-react";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { Download, LoaderCircle, RefreshCcw, Settings2, Sparkles } from "lucide-react";
+
+import {
+  canExportAiPdf,
+  initialAiPdfExportState,
+  reduceAiPdfExportState,
+} from "../utils/aiPdfExportState.js";
 
 
 export function AiAnalysisPanel({
@@ -11,18 +17,43 @@ export function AiAnalysisPanel({
   needsPassword,
   onAnalyze,
   onRefresh,
+  onExport,
   onSubmitPassword,
   onOpenSettings,
 }) {
   const [password, setPassword] = useState("");
+  const [exportState, dispatchExport] = useReducer(reduceAiPdfExportState, initialAiPdfExportState);
+  const activeTickerRef = useRef(ticker);
 
   useEffect(() => {
     if (!needsPassword) setPassword("");
     return () => setPassword("");
   }, [needsPassword, ticker]);
 
+  useEffect(() => {
+    activeTickerRef.current = ticker;
+    dispatchExport({ type: "ticker_changed" });
+  }, [ticker]);
+
   const analysis = result?.analysis;
   const errorText = error ? (t.ai.errors[error.code] ?? t.ai.errors.generic) : "";
+  const canExport = canExportAiPdf({
+    hasAnalysis: Boolean(analysis),
+    analysisStatus: status,
+    exportStatus: exportState.status,
+  });
+
+  const handleExport = async () => {
+    if (!canExport) return;
+    const startedTicker = ticker;
+    dispatchExport({ type: "start" });
+    try {
+      await onExport();
+      if (activeTickerRef.current === startedTicker) dispatchExport({ type: "success" });
+    } catch {
+      if (activeTickerRef.current === startedTicker) dispatchExport({ type: "failure" });
+    }
+  };
 
   return (
     <section className="ai-analysis-panel" aria-live="polite">
@@ -111,10 +142,25 @@ export function AiAnalysisPanel({
           </article>
           <div className="ai-analysis-meta">
             <span>{result.cached ? t.ai.cached : t.ai.generated} · {new Date(result.generated_at).toLocaleString()}</span>
-            <button type="button" className="ghost" onClick={onRefresh} disabled={status === "loading"}>
-              <RefreshCcw className={status === "loading" ? "spin" : ""} size={14} /> {t.ai.refresh}
-            </button>
+            <div className="ai-analysis-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={handleExport}
+                disabled={!canExport}
+                aria-busy={exportState.status === "exporting"}
+              >
+                {exportState.status === "exporting"
+                  ? <LoaderCircle className="spin" size={14} />
+                  : <Download size={14} />}
+                {exportState.status === "exporting" ? t.ai.exportingPdf : t.ai.exportPdf}
+              </button>
+              <button type="button" className="ghost" onClick={onRefresh} disabled={status === "loading" || exportState.status === "exporting"}>
+                <RefreshCcw className={status === "loading" ? "spin" : ""} size={14} /> {t.ai.refresh}
+              </button>
+            </div>
           </div>
+          {exportState.error && <p className="ai-inline-error" role="alert">{t.ai.exportPdfFailed}</p>}
         </div>
       )}
       <p className="ai-disclaimer">{t.ai.disclaimer}</p>

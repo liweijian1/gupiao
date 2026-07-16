@@ -33,6 +33,7 @@ import {
 } from "./hooks/useMarketData.js";
 import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
 import { copy } from "./i18n/copy.js";
+import { downloadAiAnalysisPdf } from "./utils/aiPdfReport.js";
 import { filterMacroSeries, searchableText, weightedScore, zScore } from "./utils/metrics.js";
 import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
 
@@ -271,6 +272,16 @@ export function App() {
     downloadMarkdownReport(markdown, selectedStock);
   };
 
+  const handleExportAiAnalysis = async () => {
+    if (!aiAnalysis.result) return;
+    await downloadAiAnalysisPdf({
+      lang,
+      t,
+      selectedStock,
+      result: aiAnalysis.result,
+    });
+  };
+
   return (
     <main className="terminal">
       <aside className="rail">
@@ -479,6 +490,7 @@ export function App() {
               needsPassword={showAnalysisPassword || aiAnalysis.needsPassword}
               onAnalyze={() => requestAnalysis(false)}
               onRefresh={() => requestAnalysis(true)}
+              onExport={handleExportAiAnalysis}
               onSubmitPassword={(password) => {
                 setAnalysisPassword(password);
                 setShowAnalysisPassword(false);

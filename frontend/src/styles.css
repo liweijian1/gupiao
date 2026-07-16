@@ -785,6 +785,18 @@ tbody tr:hover,
 .ai-analysis-meta {
   color: #75838d;
   font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.ai-analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ai-analysis-actions button {
+  min-height: 32px;
 }
 
 .ai-disclaimer {
@@ -1173,6 +1185,19 @@ input:disabled {
 
   .ai-analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ai-analysis-meta,
+  .ai-analysis-actions {
+    align-items: stretch;
+  }
+
+  .ai-analysis-meta {
+    flex-direction: column;
+  }
+
+  .ai-analysis-actions button {
+    flex: 1 1 auto;
   }
 
   .ai-dialog-actions,
