@@ -410,7 +410,7 @@ export function App() {
                   <button
                     type="button"
                     className="ghost provider-status"
-                    onClick={() => setShowProviderDiag((value) => !value)}
+                    onClick={() => {}}
                   >
                     {lang === "zh" ? "数据源" : "Provider"}: {activeProvider} {activeProviderHealth?.status === "cooldown" ? "⏸" : "✓"}
                   </button>
@@ -422,7 +422,7 @@ export function App() {
                 </div>
               </div>
             </div>
-            {showProviderDiag && providerDiag.length > 0 && (
+            {false && providerDiag.length > 0 && (
               <div className="provider-diag" aria-live="polite">
                 {providerDiag.map((entry) => (
                   <span key={`${entry.provider}-${entry.result}`}>
