@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Database,
   Download,
-  Filter,
   LineChart,
   RefreshCcw,
   Search,
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 
 import { MiniBars } from "./components/MiniBars.jsx";
-import { ScoreGauge } from "./components/ScoreGauge.jsx";
+import { MacroEvidenceBand } from "./components/MacroEvidenceBand.jsx";
 import { AiAnalysisPanel } from "./components/AiAnalysisPanel.jsx";
 import { AiSettingsDialog } from "./components/AiSettingsDialog.jsx";
 import { factorDefaults, macroInputs, macroTrend, spark, stocks } from "./data/mockData.js";
@@ -44,15 +43,13 @@ import {
   mergeEquityUniverses,
   resolveSelectedEquity,
 } from "./utils/equityDiscovery.js";
-import { filterMacroSeries, weightedScore, zScore } from "./utils/metrics.js";
+import { weightedScore } from "./utils/metrics.js";
 import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
 
 export function App() {
   const [lang, setLang] = useState("zh");
   const [stockQuery, setStockQuery] = useState("");
-  const [macroQuery, setMacroQuery] = useState("");
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
-  const [activeGroup, setActiveGroup] = useState("All");
   const [timeframe, setTimeframe] = useState("12M");
   const [indicator, setIndicator] = useState("Composite");
   const [factors, setFactors] = useState(factorDefaults);
@@ -204,13 +201,6 @@ export function App() {
     }
   }, [filteredStocks, selectedTicker, stockQuery]);
 
-  const macroGroups = ["All", "Growth", "Liquidity", "Inflation", "Property", "Rates", "External"];
-  const visibleMacro = useMemo(() => filterMacroSeries(macroSeries, {
-    group: activeGroup,
-    query: macroQuery,
-    macroLabels: t.macro,
-    groupLabels: t.groups,
-  }), [activeGroup, macroQuery, macroSeries, t.groups, t.macro]);
   const stockSourceStatus = deriveStockSourceStatus({
     realtimeState,
     realtimeQuote,
@@ -512,80 +502,19 @@ export function App() {
             />
           </section>
 
-          <section className="panel macro-panel nav-target" ref={macroRef}>
-            <div className="panel-title">
-              <div>
-                <small>{t.macroModel}</small>
-                <h2>{t.macroDashboard}</h2>
-              </div>
-              <button className="ghost"><Filter size={15} /> {t.modelInputs}</button>
-            </div>
-            <div className="macro-score-grid">
-              <ScoreGauge label={t.scores.growth[0]} value={growthScore} caption={t.scores.growth[1]} />
-              <ScoreGauge label={t.scores.liquidity[0]} value={liquidityScore} caption={t.scores.liquidity[1]} />
-              <ScoreGauge label={t.scores.inflation[0]} value={inflationScore} caption={t.scores.inflation[1]} />
-              <ScoreGauge label={t.scores.external[0]} value={externalScore} caption={t.scores.external[1]} />
-            </div>
-            <div className="regime-row">
-              <div className="cycle-map">
-                <span className="axis-x">{t.axes.growth}</span>
-                <span className="axis-y">{t.axes.inflation}</span>
-                <button className="cycle-dot" style={{ left: `${growthScore}%`, bottom: `${inflationScore}%` }}>{t.cycles[cycle]}</button>
-                <small className="q1">{t.cycles.Recovery}</small>
-                <small className="q2">{t.cycles.Overheat}</small>
-                <small className="q3">{t.cycles.Slowdown}</small>
-                <small className="q4">{t.cycles.Stagflation}</small>
-              </div>
-              <div className="macro-trend">
-                <div>
-                  <small>{t.compositeScore}</small>
-                  <strong>{Math.round((growthScore + liquidityScore + (100 - inflationScore)) / 3)}</strong>
-                </div>
-                <MiniBars values={macroTrend} tone="green" />
-                <p>{t.currentRead}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel macro-table nav-target" ref={dataRef}>
-            <div className="panel-title compact">
-              <div>
-                <small>{t.macroSeries}</small>
-                <h2>{t.macroMap}</h2>
-              </div>
-              <div className="macro-table-tools">
-                <label className="macro-search">
-                  <Search size={15} />
-                  <input
-                    value={macroQuery}
-                    onChange={(event) => setMacroQuery(event.target.value)}
-                    placeholder={t.macroSearch}
-                    aria-label={t.macroSearch}
-                  />
-                </label>
-                <div className="segmented scroll">
-                  {macroGroups.map((group) => (
-                    <button className={activeGroup === group ? "selected" : ""} onClick={() => setActiveGroup(group)} key={group}>{t.groups[group]}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="macro-list">
-              {visibleMacro.length === 0 && (
-                <p className="macro-empty" aria-live="polite">{t.noMacroMatches}</p>
-              )}
-              {visibleMacro.map((item) => (
-                <button className="macro-row" onClick={() => setIndicator(item.key)} key={item.key}>
-                  <span>
-                    <strong>{t.macro[item.key]}</strong>
-                    <small>{item.api}</small>
-                  </span>
-                  <b>{item.value}{item.unit}</b>
-                  <em>{item.score ?? zScore(item.z, item.direction)}</em>
-                </button>
-              ))}
-            </div>
-          </section>
+          <MacroEvidenceBand
+            t={t}
+            scores={{ growth: growthScore, liquidity: liquidityScore, inflation: inflationScore, external: externalScore }}
+            cycle={cycle}
+            trendValues={macroTrend}
+            macroSeries={macroSeries}
+            sourceStatus={macroSourceStatus}
+            selectedIndicator={indicator}
+            overviewRef={macroRef}
+            dataMapRef={dataRef}
+            onRetry={retryMacroSnapshot}
+            onSelectIndicator={setIndicator}
+          />
         </div>
       </section>
       <AiSettingsDialog
