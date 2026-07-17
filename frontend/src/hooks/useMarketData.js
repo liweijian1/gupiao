@@ -1,74 +1,60 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 
 import { API_BASE_URL } from "../config.js";
+import {
+  classifyStockSearchSnapshot,
+  retainStockSearchSnapshot,
+} from "../utils/dataSourceStatus.js";
+import {
+  initialSnapshotRequestState,
+  snapshotRequestReducer,
+} from "../utils/snapshotRequestState.js";
 
-export function useMacroSnapshot() {
-  const [macroSnapshot, setMacroSnapshot] = useState(null);
+function useSnapshotRequest(path, label) {
+  const [state, dispatch] = useReducer(snapshotRequestReducer, initialSnapshotRequestState);
+  const [requestVersion, setRequestVersion] = useState(0);
+  const retry = useCallback(() => setRequestVersion((value) => value + 1), []);
 
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
+    const requestPath = requestVersion > 0 ? `${path}?force=true` : path;
+    dispatch({ type: "start" });
 
-    fetch(`${API_BASE_URL}/api/macro/snapshot`)
+    fetch(`${API_BASE_URL}${requestPath}`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) {
-          throw new Error(`Macro API returned ${response.status}`);
+          throw new Error(`${label} API returned ${response.status}`);
         }
         return response.json();
       })
       .then((snapshot) => {
-        if (mounted) {
-          setMacroSnapshot(snapshot);
-        }
+        dispatch({ type: "success", snapshot });
       })
-      .catch(() => {
-        if (mounted) {
-          setMacroSnapshot(null);
-        }
+      .catch((error) => {
+        if (error.name !== "AbortError") dispatch({ type: "failure", error });
       });
 
     return () => {
-      mounted = false;
+      controller.abort();
     };
-  }, []);
+  }, [label, path, requestVersion]);
 
-  return macroSnapshot;
+  return { ...state, retry };
+}
+
+export function useMacroSnapshot() {
+  return useSnapshotRequest("/api/macro/snapshot", "Macro");
 }
 
 export function useStockSnapshot() {
-  const [stockSnapshot, setStockSnapshot] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    fetch(`${API_BASE_URL}/api/stocks/snapshot`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Stock API returned ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((snapshot) => {
-        if (mounted) {
-          setStockSnapshot(snapshot);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setStockSnapshot(null);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return stockSnapshot;
+  return useSnapshotRequest("/api/stocks/snapshot", "Stock");
 }
 
 export function useStockSearch(query) {
   const [searchSnapshot, setSearchSnapshot] = useState(null);
   const [searchState, setSearchState] = useState("idle");
+  const [searchRequestVersion, setSearchRequestVersion] = useState(0);
+  const retrySearch = useCallback(() => setSearchRequestVersion((value) => value + 1), []);
 
   useEffect(() => {
     const normalizedQuery = query.trim();
@@ -82,6 +68,9 @@ export function useStockSearch(query) {
     let retryTimer;
     const timer = window.setTimeout(() => {
       setSearchState("loading");
+      setSearchSnapshot((previous) => (
+        previous?.query === normalizedQuery ? previous : null
+      ));
       const runSearch = async (attempt = 0) => {
         try {
           const response = await fetch(`${API_BASE_URL}/api/stocks/search?q=${encodeURIComponent(normalizedQuery)}&limit=30`, {
@@ -91,18 +80,24 @@ export function useStockSearch(query) {
             throw new Error(`Stock search API returned ${response.status}`);
           }
           const snapshot = await response.json();
-          if (snapshot.warning && snapshot.stocks?.length === 0 && attempt === 0) {
+          const outcome = classifyStockSearchSnapshot(snapshot);
+          if (outcome === "error" && attempt === 0) {
             retryTimer = window.setTimeout(() => runSearch(1), 800);
             return;
           }
-          setSearchSnapshot(snapshot);
-          setSearchState(snapshot.warning && snapshot.stocks?.length === 0 ? "error" : "ready");
+          setSearchSnapshot((previous) => retainStockSearchSnapshot(previous, snapshot, outcome));
+          setSearchState(outcome);
         } catch (error) {
           if (error.name !== "AbortError") {
             if (attempt === 0) {
               retryTimer = window.setTimeout(() => runSearch(1), 800);
             } else {
-              setSearchSnapshot({ stocks: [], warning: error.message });
+              const failedSnapshot = {
+                query: normalizedQuery,
+                stocks: [],
+                warning: error.message,
+              };
+              setSearchSnapshot((previous) => retainStockSearchSnapshot(previous, failedSnapshot, "error"));
               setSearchState("error");
             }
           }
@@ -116,9 +111,9 @@ export function useStockSearch(query) {
       window.clearTimeout(retryTimer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, searchRequestVersion]);
 
-  return { searchSnapshot, searchState };
+  return { searchSnapshot, searchState, retrySearch };
 }
 
 export function useProviderHealth(updatedAt) {

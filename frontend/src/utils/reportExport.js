@@ -63,7 +63,7 @@ export function buildMarkdownReport({
     `| ${t.scores.external[0]} | ${macroScores.external} |`,
     `| ${isZh ? "周期" : "Cycle"} | ${t.cycles[cycle] ?? cycle} |`,
     "",
-    `## ${isZh ? "股票排名 Top 10" : "Ranked equities Top 10"}`,
+    `## ${isZh ? "全市场股票排名 Top 10" : "All-market ranked equities Top 10"}`,
     "",
     `| ${isZh ? "代码" : "Ticker"} | ${isZh ? "名称" : "Name"} | ${isZh ? "行业" : "Sector"} | ${isZh ? "价格" : "Price"} | ${isZh ? "涨跌" : "Change"} | ${isZh ? "评分" : "Score"} |`,
     "|---|---|---|---:|---:|---:|",

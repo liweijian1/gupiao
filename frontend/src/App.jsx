@@ -35,6 +35,10 @@ import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
 import { copy } from "./i18n/copy.js";
 import { downloadAiAnalysisPdf } from "./utils/aiPdfReport.js";
 import {
+  deriveMacroSourceStatus,
+  deriveStockSourceStatus,
+} from "./utils/dataSourceStatus.js";
+import {
   applyRealtimeQuote,
   filterAndSortEquities,
   mergeEquityUniverses,
@@ -59,9 +63,19 @@ export function App() {
   const [analysisPassword, setAnalysisPassword] = useState("");
   const [pendingAnalysisForce, setPendingAnalysisForce] = useState(null);
   const [activeNav, setActiveNav] = useState(0);
-  const macroSnapshot = useMacroSnapshot();
-  const stockSnapshot = useStockSnapshot();
-  const { searchSnapshot, searchState } = useStockSearch(stockQuery);
+  const {
+    snapshot: macroSnapshot,
+    status: macroSnapshotStatus,
+    error: macroSnapshotError,
+    retry: retryMacroSnapshot,
+  } = useMacroSnapshot();
+  const {
+    snapshot: stockSnapshot,
+    status: stockSnapshotStatus,
+    error: stockSnapshotError,
+    retry: retryStockSnapshot,
+  } = useStockSnapshot();
+  const { searchSnapshot, searchState, retrySearch } = useStockSearch(stockQuery);
   const screenerRef = useRef(null);
   const macroRef = useRef(null);
   const chartRef = useRef(null);
@@ -150,6 +164,10 @@ export function App() {
       weight: item.weight,
       score: item.score,
       source: item.source,
+      points: item.points,
+      latestDate: item.latest_date,
+      updatedAt: item.updated_at,
+      error: item.error,
     }));
   }, [macroSnapshot]);
 
@@ -193,24 +211,27 @@ export function App() {
     macroLabels: t.macro,
     groupLabels: t.groups,
   }), [activeGroup, macroQuery, macroSeries, t.groups, t.macro]);
+  const stockSourceStatus = deriveStockSourceStatus({
+    realtimeState,
+    realtimeQuote,
+    realtimeMeta,
+    lang,
+    stockQuery,
+    searchSnapshot,
+    searchState,
+    stockSnapshot,
+    stockSnapshotStatus,
+    stockSnapshotError,
+  });
+  const stockSource = stockSourceStatus.label;
+  const macroSourceStatus = deriveMacroSourceStatus({
+    requestStatus: macroSnapshotStatus,
+    snapshot: macroSnapshot,
+    error: macroSnapshotError,
+    lang,
+  });
   const macroSource = macroSnapshot?.source ?? "mock";
   const activeProvider = realtimeQuote?.provider ?? realtimeMeta?.quote?.provider;
-  const marketStatusLabel = {
-    before_open: lang === "zh" ? "盘前" : "before open",
-    pre_market: lang === "zh" ? "集合竞价" : "pre-market",
-    open: lang === "zh" ? "交易中" : "open",
-    lunch_break: lang === "zh" ? "午休" : "lunch",
-    after_close: lang === "zh" ? "收盘后" : "after close",
-    weekend: lang === "zh" ? "周末" : "weekend",
-  }[realtimeMeta?.market_status] ?? (realtimeMeta?.market_open ? (lang === "zh" ? "交易中" : "open") : (lang === "zh" ? "休市" : "closed"));
-
-  const stockSource = realtimeState === "live"
-    ? `${activeProvider ?? "realtime"} · realtime${realtimeQuote?.market_time ? ` · ${realtimeQuote.market_time}` : ""}`
-    : realtimeState === "cached"
-      ? `${activeProvider ?? "cache"} · ${marketStatusLabel}${realtimeQuote?.market_date ? ` · ${realtimeQuote.market_date}` : ""}`
-      : realtimeState === "stale"
-        ? `${activeProvider ?? "cache"} · ${lang === "zh" ? "缓存重试中" : "cache retry"}`
-        : (stockQuery.trim() && searchSnapshot?.source) || stockSnapshot?.source || "mock";
 
   const providerDiag = realtimeMeta?.source_chain ?? [];
   const activeProviderHealth = providerHealth?.providers?.find((item) => item.name === activeProvider);

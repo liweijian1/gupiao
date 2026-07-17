@@ -39,3 +39,20 @@ test("group and macro text filters combine", () => {
     [items[2]],
   );
 });
+
+test("macro filtering searches zero values, source, and API without mutating input", () => {
+  const extended = [
+    ...items,
+    { key: "Zero", group: "External", api: "zero_api()", value: 0, score: 0, source: "fallback-cache" },
+  ];
+  const before = structuredClone(extended);
+  const extendedOptions = {
+    ...options,
+    macroLabels: { ...options.macroLabels, Zero: "零值指标" },
+    groupLabels: { ...options.groupLabels, External: "外部" },
+  };
+  assert.deepEqual(filterMacroSeries(extended, { ...extendedOptions, query: "zero_api" }), [extended[3]]);
+  assert.deepEqual(filterMacroSeries(extended, { ...extendedOptions, query: "fallback-cache" }), [extended[3]]);
+  assert.deepEqual(filterMacroSeries(extended, { ...extendedOptions, group: "External", query: "0" }), [extended[3]]);
+  assert.deepEqual(extended, before);
+});

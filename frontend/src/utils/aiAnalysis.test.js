@@ -25,3 +25,21 @@ test("normalizes nested FastAPI error codes", () => {
     retryAfter: null,
   });
 });
+
+test("refresh failure keeps the last valid analysis visible", () => {
+  const result = { ticker: "600519", cached: true, analysis: { rating: "bullish" } };
+  const state = aiAnalysisReducer(
+    { status: "loading", result, error: null, needsPassword: false },
+    { type: "error", error: { code: "upstream_timeout" } },
+  );
+  assert.equal(state.status, "error");
+  assert.equal(state.result, result);
+  assert.equal(state.error.code, "upstream_timeout");
+});
+
+test("password-required state keeps a previously visible analysis", () => {
+  const result = { ticker: "600519", cached: true, analysis: { rating: "neutral" } };
+  const state = aiAnalysisReducer({ ...initialAiAnalysisState, result }, { type: "password-required" });
+  assert.equal(state.result, result);
+  assert.equal(state.needsPassword, true);
+});
