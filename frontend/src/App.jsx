@@ -34,7 +34,13 @@ import {
 import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
 import { copy } from "./i18n/copy.js";
 import { downloadAiAnalysisPdf } from "./utils/aiPdfReport.js";
-import { filterMacroSeries, searchableText, weightedScore, zScore } from "./utils/metrics.js";
+import {
+  applyRealtimeQuote,
+  filterAndSortEquities,
+  mergeEquityUniverses,
+  resolveSelectedEquity,
+} from "./utils/equityDiscovery.js";
+import { filterMacroSeries, weightedScore, zScore } from "./utils/metrics.js";
 import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
 
 export function App() {
@@ -106,33 +112,28 @@ export function App() {
     };
   }, []);
 
-  const stockUniverse = useMemo(() => {
-    if (stockSnapshot?.stocks?.length) {
-      return stockSnapshot.stocks;
-    }
-    return stocks;
-  }, [stockSnapshot]);
+  const stockUniverse = useMemo(() => mergeEquityUniverses(
+    stocks.map((stock) => ({ ...stock, source: stock.source ?? "prototype" })),
+    stockSnapshot?.stocks ?? [],
+  ), [stockSnapshot]);
 
   const activeStockUniverse = stockQuery.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
-  const baseDetailStockUniverse = useMemo(() => {
-    const combined = [...stockUniverse, ...activeStockUniverse];
-    return [...new Map(combined.map((stock) => [stock.ticker, stock])).values()];
-  }, [activeStockUniverse, stockUniverse]);
-  const selectedStockBase = baseDetailStockUniverse.find((stock) => stock.ticker === selectedTicker) ?? baseDetailStockUniverse[0] ?? stocks[0];
+  const baseDetailStockUniverse = useMemo(
+    () => mergeEquityUniverses(stockUniverse, activeStockUniverse),
+    [activeStockUniverse, stockUniverse],
+  );
+  const selectedStockBase = resolveSelectedEquity(baseDetailStockUniverse, selectedTicker, stocks[0]);
   const { realtimeQuote, realtimeMeta, realtimeState } = useRealtimeQuote(selectedStockBase);
   const providerHealth = useProviderHealth(realtimeMeta?.updated_at);
 
-  const displayedStockUniverse = useMemo(() => (
-    activeStockUniverse.map((stock) => (
-      realtimeQuote?.ticker === stock.ticker
-        ? { ...stock, price: realtimeQuote.price, chg: realtimeQuote.chg, source: realtimeQuote.source }
-        : stock
-    ))
-  ), [activeStockUniverse, realtimeQuote]);
-  const detailStockUniverse = useMemo(() => {
-    const combined = [...stockUniverse, ...displayedStockUniverse];
-    return [...new Map(combined.map((stock) => [stock.ticker, stock])).values()];
-  }, [displayedStockUniverse, stockUniverse]);
+  const displayedStockUniverse = useMemo(
+    () => applyRealtimeQuote(activeStockUniverse, realtimeQuote),
+    [activeStockUniverse, realtimeQuote],
+  );
+  const detailStockUniverse = useMemo(
+    () => mergeEquityUniverses(stockUniverse, displayedStockUniverse),
+    [displayedStockUniverse, stockUniverse],
+  );
 
   const macroSeries = useMemo(() => {
     if (!macroSnapshot?.series) {
@@ -152,7 +153,16 @@ export function App() {
     }));
   }, [macroSnapshot]);
 
-  const selectedStock = detailStockUniverse.find((stock) => stock.ticker === selectedTicker) ?? detailStockUniverse[0] ?? stocks[0];
+  const selectedStock = resolveSelectedEquity(detailStockUniverse, selectedTicker, stocks[0]);
+
+  useEffect(() => {
+    const selectedStillExists = detailStockUniverse.some(
+      (stock) => stock.ticker === selectedTicker,
+    );
+    if (!selectedStillExists && selectedStock.ticker !== selectedTicker) {
+      setSelectedTicker(selectedStock.ticker);
+    }
+  }, [detailStockUniverse, selectedStock.ticker, selectedTicker]);
   const aiAnalysis = useAiAnalysis({ ticker: selectedStock.ticker, lang, analysisPassword });
   const growthScore = macroSnapshot?.scores?.economic_climate ?? weightedScore(macroSeries.filter((item) => item.group === "Growth" || item.group === "Property"));
   const liquidityScore = macroSnapshot?.scores?.liquidity ?? weightedScore(macroSeries.filter((item) => item.group === "Liquidity" || item.group === "Rates"));
@@ -160,40 +170,21 @@ export function App() {
   const externalScore = macroSnapshot?.scores?.external_pressure ?? weightedScore(macroSeries.filter((item) => item.group === "External"));
   const cycle = macroSnapshot?.scores?.cycle ?? (growthScore > 58 && inflationScore < 55 ? "Recovery" : growthScore > 60 && inflationScore >= 55 ? "Overheat" : growthScore < 48 && inflationScore > 55 ? "Stagflation" : "Slowdown");
 
-  const filteredStocks = useMemo(() => {
-    const normalizedQuery = stockQuery.trim().toLowerCase();
-    return displayedStockUniverse
-      .filter((stock) => {
-        const matchesQuery =
-          normalizedQuery.length === 0 ||
-          searchableText(
-            stock.ticker,
-            stock.name,
-            stock.aliases?.join(" "),
-            stock.exchange,
-            stock.sector,
-            t.sectors[stock.sector],
-            stock.price,
-            stock.score,
-            stock.growth,
-            stock.rsi,
-          ).includes(normalizedQuery);
-        const factorGate =
-          stock.trend >= factors.momentum - 25 &&
-          stock.score >= factors.quality - 10 &&
-          stock.pe <= 65 - factors.valuation * 0.35 &&
-          stock.liquidity >= factors.liquidity - 20 &&
-          stock.beta <= 2.2 - factors.volatility * 0.012;
-        return matchesQuery && (normalizedQuery.length > 0 || factorGate);
-      })
-      .sort((a, b) => b[sortKey] - a[sortKey]);
-  }, [stockQuery, factors, sortKey, displayedStockUniverse, t.sectors]);
+  const filteredStocks = useMemo(() => filterAndSortEquities(displayedStockUniverse, {
+    query: stockQuery,
+    factors,
+    sortKey,
+    sectorLabels: t.sectors,
+  }), [displayedStockUniverse, factors, sortKey, stockQuery, t.sectors]);
 
   useEffect(() => {
-    if (stockQuery.trim().length > 0 && filteredStocks.length > 0) {
+    const selectedIsVisible = filteredStocks.some(
+      (stock) => stock.ticker === selectedTicker,
+    );
+    if (stockQuery.trim().length > 0 && filteredStocks.length > 0 && !selectedIsVisible) {
       setSelectedTicker(filteredStocks[0].ticker);
     }
-  }, [filteredStocks, stockQuery]);
+  }, [filteredStocks, selectedTicker, stockQuery]);
 
   const macroGroups = ["All", "Growth", "Liquidity", "Inflation", "Property", "Rates", "External"];
   const visibleMacro = useMemo(() => filterMacroSeries(macroSeries, {
