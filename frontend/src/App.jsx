@@ -10,10 +10,11 @@ import {
   RefreshCcw,
   Search,
   Settings2,
-  SlidersHorizontal,
 } from "lucide-react";
 
 import { MiniBars } from "./components/MiniBars.jsx";
+import { EquityDiscoveryPanel } from "./components/EquityDiscoveryPanel.jsx";
+import { AppShell } from "./components/AppShell.jsx";
 import { MacroEvidenceBand } from "./components/MacroEvidenceBand.jsx";
 import { StockDecisionWorkspace } from "./components/StockDecisionWorkspace.jsx";
 import { AiResearchPanel } from "./components/AiResearchPanel.jsx";
@@ -45,11 +46,10 @@ import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExpor
 export function App() {
   const [lang, setLang] = useState("zh");
   const [stockQuery, setStockQuery] = useState("");
-  const [selectedTicker, setSelectedTicker] = useState("NVDA");
+  const [selectedTicker, setSelectedTicker] = useState("600519");
   const [indicator, setIndicator] = useState("Composite");
   const [factors, setFactors] = useState(factorDefaults);
   const [sortKey, setSortKey] = useState("score");
-  const [showProviderDiag, setShowProviderDiag] = useState(false);
   const [showAiSettings, setShowAiSettings] = useState(false);
   const [showAnalysisPassword, setShowAnalysisPassword] = useState(false);
   const [analysisPassword, setAnalysisPassword] = useState("");
@@ -280,7 +280,9 @@ export function App() {
   };
 
   return (
-    <main className="terminal">
+    <>
+    <AppShell t={t} lang={lang} stockQuery={stockQuery} activeNav={activeNav} stockSourceStatus={stockSourceStatus} macroSourceStatus={macroSourceStatus} reportButtonRef={reportRef} onStockQueryChange={setStockQuery} onLanguageChange={setLang} onNavigate={handleNavigation} onOpenAiSettings={() => setShowAiSettings(true)} onExportReport={handleExportReport}>
+      {false && <main className="terminal">
       <aside className="rail">
         <div className="brand">
           <span>Q</span>
@@ -341,7 +343,27 @@ export function App() {
         </header>
 
         <div className="content-grid">
-          <section className="panel factor-panel nav-target" ref={screenerRef}>
+          <EquityDiscoveryPanel
+            t={t}
+            stocks={filteredStocks}
+            selectedTicker={selectedTicker}
+            factors={factors}
+            sortKey={sortKey}
+            searchState={searchState}
+            stockSourceStatus={stockSourceStatus}
+            realtimeMeta={realtimeMeta}
+            activeProvider={activeProvider}
+            activeProviderHealth={activeProviderHealth}
+            providerDiag={providerDiag}
+            sectionRef={screenerRef}
+            onRetryStockSnapshot={retryStockSnapshot}
+            onRetrySearch={retrySearch}
+            onSelectTicker={setSelectedTicker}
+            onFactorsChange={setFactors}
+            onSortChange={setSortKey}
+          />
+          {/* Legacy factor/table panels removed; discovery owns those controls. */}
+          {false && <section className="panel factor-panel nav-target" ref={screenerRef}>
             <div className="panel-title">
               <div>
                 <small>{t.factorBuilder}</small>
@@ -372,9 +394,9 @@ export function App() {
               <MiniBars values={[22, 34, 30, 42, 55, 49, 66, 72, 80, 76, 88, 92]} />
               <div><span>{t.alpha}</span><b className="up">+8.6%</b></div>
             </div>
-          </section>
+          </section>}
 
-          <section className="panel table-panel">
+          {false && <section className="panel table-panel">
             <div className="panel-title compact">
               <div>
                 <small>{filteredStocks.length} {t.matches} · {stockSource}</small>
@@ -442,7 +464,7 @@ export function App() {
                 ))}
               </tbody>
             </table>
-          </section>
+          </section>}
 
           <StockDecisionWorkspace
             t={t}
@@ -488,13 +510,20 @@ export function App() {
             onSelectIndicator={setIndicator}
           />
         </div>
-      </section>
+      </section></main>}
+      <div className="content-grid">
+        <StockDecisionWorkspace t={t} lang={lang} stock={selectedStock} indicator={indicator} indicatorOptions={macroSeries} realtimeMeta={realtimeMeta} sectionRef={chartRef} onIndicatorChange={setIndicator} />
+        <AiResearchPanel t={t} lang={lang} ticker={selectedStock.ticker} score={selectedStock.score} status={aiAnalysis.status} result={aiAnalysis.result} error={aiAnalysis.error} needsPassword={showAnalysisPassword || aiAnalysis.needsPassword} onAnalyze={() => requestAnalysis(false)} onRefresh={() => requestAnalysis(true)} onExport={handleExportAiAnalysis} onSubmitPassword={(password) => { setAnalysisPassword(password); setShowAnalysisPassword(false); if (pendingAnalysisForce === null) setPendingAnalysisForce(false); }} onOpenSettings={() => setShowAiSettings(true)} />
+        <EquityDiscoveryPanel t={t} stocks={filteredStocks} selectedTicker={selectedTicker} factors={factors} sortKey={sortKey} searchState={searchState} stockSourceStatus={stockSourceStatus} realtimeMeta={realtimeMeta} activeProvider={activeProvider} activeProviderHealth={activeProviderHealth} providerDiag={providerDiag} sectionRef={screenerRef} onRetryStockSnapshot={retryStockSnapshot} onRetrySearch={retrySearch} onSelectTicker={setSelectedTicker} onFactorsChange={setFactors} onSortChange={setSortKey} />
+        <MacroEvidenceBand t={t} scores={{ growth: growthScore, liquidity: liquidityScore, inflation: inflationScore, external: externalScore }} cycle={cycle} trendValues={macroTrend} macroSeries={macroSeries} sourceStatus={macroSourceStatus} selectedIndicator={indicator} overviewRef={macroRef} dataMapRef={dataRef} onRetry={retryMacroSnapshot} onSelectIndicator={setIndicator} />
+      </div>
+    </AppShell>
       <AiSettingsDialog
         open={showAiSettings}
         onClose={() => setShowAiSettings(false)}
         onSaved={() => setShowAiSettings(false)}
         t={t}
       />
-    </main>
+    </>
   );
 }
