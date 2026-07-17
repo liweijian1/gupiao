@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { aiAnalysisReducer, initialAiAnalysisState, normalizeAiError } from "./aiAnalysis.js";
+import { aiAnalysisReducer, getVisibleAiResult, initialAiAnalysisState, normalizeAiError } from "./aiAnalysis.js";
 
 test("loading preserves a cached result during refresh", () => {
   const cached = { ticker: "600519", cached: true, analysis: { rating: "neutral" } };
@@ -42,4 +42,12 @@ test("password-required state keeps a previously visible analysis", () => {
   const state = aiAnalysisReducer({ ...initialAiAnalysisState, result }, { type: "password-required" });
   assert.equal(state.result, result);
   assert.equal(state.needsPassword, true);
+});
+
+test("shows an AI result only for the current ticker and language", () => {
+  const result = { ticker: "600519", lang: "zh", analysis: { rating: "bullish" } };
+  assert.equal(getVisibleAiResult(result, "600519", "zh"), result);
+  assert.equal(getVisibleAiResult(result, "NVDA", "zh"), null);
+  assert.equal(getVisibleAiResult(result, "600519", "en"), null);
+  assert.equal(getVisibleAiResult(null, "600519", "zh"), null);
 });

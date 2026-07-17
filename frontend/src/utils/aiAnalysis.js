@@ -14,6 +14,10 @@ export function normalizeAiError(status, payload = {}) {
   };
 }
 
+export function getVisibleAiResult(result, ticker, lang) {
+  return result?.ticker === ticker && result?.lang === lang ? result : null;
+}
+
 export function aiAnalysisReducer(state, action) {
   switch (action.type) {
     case "reset":

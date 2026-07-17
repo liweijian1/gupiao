@@ -16,7 +16,7 @@ import {
 import { MiniBars } from "./components/MiniBars.jsx";
 import { MacroEvidenceBand } from "./components/MacroEvidenceBand.jsx";
 import { StockDecisionWorkspace } from "./components/StockDecisionWorkspace.jsx";
-import { AiAnalysisPanel } from "./components/AiAnalysisPanel.jsx";
+import { AiResearchPanel } from "./components/AiResearchPanel.jsx";
 import { AiSettingsDialog } from "./components/AiSettingsDialog.jsx";
 import { factorDefaults, macroInputs, macroTrend, spark, stocks } from "./data/mockData.js";
 import {
@@ -454,9 +454,11 @@ export function App() {
             sectionRef={chartRef}
             onIndicatorChange={setIndicator}
           />
-          <AiAnalysisPanel
+          <AiResearchPanel
             t={t}
+            lang={lang}
             ticker={selectedStock.ticker}
+            score={selectedStock.score}
             status={aiAnalysis.status}
             result={aiAnalysis.result}
             error={aiAnalysis.error}
