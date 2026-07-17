@@ -4,7 +4,6 @@ import {
   BarChart3,
   Bell,
   BookOpenCheck,
-  ChevronDown,
   Database,
   Download,
   LineChart,
@@ -12,14 +11,11 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
-  Sparkles,
-  Target,
-  TrendingDown,
-  TrendingUp,
 } from "lucide-react";
 
 import { MiniBars } from "./components/MiniBars.jsx";
 import { MacroEvidenceBand } from "./components/MacroEvidenceBand.jsx";
+import { StockDecisionWorkspace } from "./components/StockDecisionWorkspace.jsx";
 import { AiAnalysisPanel } from "./components/AiAnalysisPanel.jsx";
 import { AiSettingsDialog } from "./components/AiSettingsDialog.jsx";
 import { factorDefaults, macroInputs, macroTrend, spark, stocks } from "./data/mockData.js";
@@ -50,7 +46,6 @@ export function App() {
   const [lang, setLang] = useState("zh");
   const [stockQuery, setStockQuery] = useState("");
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
-  const [timeframe, setTimeframe] = useState("12M");
   const [indicator, setIndicator] = useState("Composite");
   const [factors, setFactors] = useState(factorDefaults);
   const [sortKey, setSortKey] = useState("score");
@@ -449,58 +444,33 @@ export function App() {
             </table>
           </section>
 
-          <section className="panel detail-panel nav-target" ref={chartRef}>
-            <div className="panel-title compact">
-              <div>
-                <small>{t.selectedEquity}</small>
-                <h2>{selectedStock.ticker} · {selectedStock.name}</h2>
-              </div>
-              <div className="detail-title-actions">
-                <button type="button" className="ghost" onClick={() => requestAnalysis(false)}>
-                  <Sparkles size={14} /> {t.ai.analysis}
-                </button>
-                <Target size={18} />
-              </div>
-            </div>
-            <div className="price-line">
-              <strong>{selectedStock.currency}{selectedStock.price.toFixed(2)}</strong>
-              <span className={selectedStock.chg > 0 ? "up" : "down"}>{selectedStock.chg > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}{selectedStock.chg}%</span>
-            </div>
-            <div className="chart-toolbar">
-              {["1M", "3M", "12M", "3Y"].map((item) => (
-                <button className={timeframe === item ? "selected" : ""} onClick={() => setTimeframe(item)} key={item}>{item}</button>
-              ))}
-              <button>{t.macro[indicator] ?? (indicator === "Composite" ? t.composite : indicator)} <ChevronDown size={14} /></button>
-            </div>
-            <div className="price-chart">
-              {spark.map((value, index) => (
-                <i key={index} style={{ height: `${value}%`, transform: `translateY(${index % 2 === 0 ? 8 : -2}px)` }} />
-              ))}
-            </div>
-            <div className="metric-grid">
-              <span>{lang === "zh" ? "因子评分" : "Factor score"} <b>{selectedStock.score}</b></span>
-              <span>Beta <b>{selectedStock.beta}</b></span>
-              <span>{t.factors.liquidity} <b>{selectedStock.liquidity}</b></span>
-              <span>{t.factors.momentum} <b>{selectedStock.trend}</b></span>
-            </div>
-            <AiAnalysisPanel
-              t={t}
-              ticker={selectedStock.ticker}
-              status={aiAnalysis.status}
-              result={aiAnalysis.result}
-              error={aiAnalysis.error}
-              needsPassword={showAnalysisPassword || aiAnalysis.needsPassword}
-              onAnalyze={() => requestAnalysis(false)}
-              onRefresh={() => requestAnalysis(true)}
-              onExport={handleExportAiAnalysis}
-              onSubmitPassword={(password) => {
-                setAnalysisPassword(password);
-                setShowAnalysisPassword(false);
-                if (pendingAnalysisForce === null) setPendingAnalysisForce(false);
-              }}
-              onOpenSettings={() => setShowAiSettings(true)}
-            />
-          </section>
+          <StockDecisionWorkspace
+            t={t}
+            lang={lang}
+            stock={selectedStock}
+            indicator={indicator}
+            indicatorOptions={macroSeries}
+            realtimeMeta={realtimeMeta}
+            sectionRef={chartRef}
+            onIndicatorChange={setIndicator}
+          />
+          <AiAnalysisPanel
+            t={t}
+            ticker={selectedStock.ticker}
+            status={aiAnalysis.status}
+            result={aiAnalysis.result}
+            error={aiAnalysis.error}
+            needsPassword={showAnalysisPassword || aiAnalysis.needsPassword}
+            onAnalyze={() => requestAnalysis(false)}
+            onRefresh={() => requestAnalysis(true)}
+            onExport={handleExportAiAnalysis}
+            onSubmitPassword={(password) => {
+              setAnalysisPassword(password);
+              setShowAnalysisPassword(false);
+              if (pendingAnalysisForce === null) setPendingAnalysisForce(false);
+            }}
+            onOpenSettings={() => setShowAiSettings(true)}
+          />
 
           <MacroEvidenceBand
             t={t}
