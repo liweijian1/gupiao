@@ -13,7 +13,7 @@ export function MacroEvidenceBand({
 
   return (
     <section className="panel macro-evidence-band nav-target" ref={overviewRef} aria-labelledby="macro-evidence-title">
-      <div className="macro-evidence-overview">
+      <div className="macro-evidence-overview macro-regime-summary">
         <header className="region-heading">
           <div>
             <small>{t.macroModel} · {sourceStatus.label}</small>
