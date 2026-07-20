@@ -17,6 +17,11 @@ test("renders the selected decision-cockpit anatomy instead of card-based placeh
   assert.match(shell, /decision-command-bar/);
   assert.match(shell, /"总览", "股票", "宏观", "图表", "报告"/);
   assert.match(discovery, /ranked-equity-table/);
+  assert.match(discovery, /const \[isFactorBuilderOpen, setFactorBuilderOpen\] = useState\(false\)/);
+  assert.match(discovery, /const \[draftFactors, setDraftFactors\] = useState\(\(\) => copyFactorDraft\(factors\)\)/);
+  assert.match(discovery, /aria-expanded=\{isFactorBuilderOpen\}/);
+  assert.match(discovery, /onFactorsChange\(copyFactorDraft\(draftFactors\)\)/);
+  assert.match(discovery, /setFactorBuilderOpen\(false\)/);
   assert.match(workspace, /candlestick-chart/);
   assert.match(workspace, /factor-strip/);
   assert.match(ai, /ai-decision-summary/);
@@ -33,6 +38,9 @@ test("uses the reference typography and controls for macro, market tabs, and ico
   assert.match(styles, /\.decision-rail nav button\s*\{[^}]*font-size:\s*11px/);
   assert.match(styles, /\.decision-rail nav button\s*\{[^}]*justify-items:\s*center/);
   assert.match(styles, /\.decision-rail nav button span\s*\{[^}]*width:\s*100%[^}]*text-align:\s*center/);
+  assert.match(styles, /\.factor-builder-editor\s*\{[^}]*display:\s*grid[^}]*border-top:/);
+  assert.match(styles, /\.factor-builder-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto/);
+  assert.match(styles, /\.factor-builder-actions\s*\{[^}]*grid-template-columns:\s*1fr 1fr/);
   assert.match(styles, /\.macro-evidence-overview\s*\{[^}]*grid-template-rows:\s*auto auto 72px minmax\(148px,\s*1fr\)/);
   assert.match(styles, /\.macro-data-map\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0,\s*1fr\)/);
 });

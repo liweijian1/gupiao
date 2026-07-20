@@ -1415,6 +1415,72 @@ input:disabled {
   text-overflow: ellipsis;
 }
 
+/* Draft-only factor editor in the equity discovery rail. */
+.factor-builder-editor {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--cockpit-line);
+  border-bottom: 1px solid var(--cockpit-line);
+  background: #0d151b;
+}
+
+.factor-builder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  color: #aebac1;
+  font-size: 11px;
+}
+
+.factor-builder-row b {
+  color: var(--cockpit-teal);
+  font-variant-numeric: tabular-nums;
+}
+
+.factor-builder-row input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--cockpit-teal);
+}
+
+.factor-builder-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.factor-builder-presets button {
+  border: 1px solid #2d3942;
+  border-radius: 4px;
+  background: #111a21;
+  color: #b5c0c7;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.factor-builder-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.factor-builder-actions button {
+  min-height: 30px;
+}
+
+.quick-filters {
+  display: grid;
+  gap: 5px;
+}
+
+.quick-filters span {
+  color: #82909a;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
 @media (max-width: 1180px) {
   .decision-workspace .content-grid {
     grid-template-rows: 620px minmax(640px, auto);
