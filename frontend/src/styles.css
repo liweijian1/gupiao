@@ -1470,6 +1470,62 @@ input:disabled {
   min-height: 30px;
 }
 
+/* Keep the macro comparison control aligned with the terminal toolbar,
+   rather than inheriting the browser's light native select treatment. */
+.decision-chart-toolbar .indicator-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #98a7b0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.decision-chart-toolbar .indicator-control select {
+  min-width: 128px;
+  height: 28px;
+  appearance: none;
+  border: 1px solid #31404a;
+  border-radius: 4px;
+  outline: none;
+  padding: 0 28px 0 10px;
+  background: #10181f;
+  color: #dbe6e8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.decision-chart-toolbar .indicator-control::after {
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid #94a5ae;
+  border-bottom: 1.5px solid #94a5ae;
+  content: "";
+  pointer-events: none;
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.decision-chart-toolbar .indicator-control select:hover {
+  border-color: #46636a;
+  background: #132027;
+}
+
+.decision-chart-toolbar .indicator-control select:focus-visible {
+  border-color: var(--cockpit-teal);
+  box-shadow: 0 0 0 2px rgba(78, 216, 183, .16);
+}
+
 .quick-filters {
   display: grid;
   gap: 5px;

@@ -38,6 +38,9 @@ test("uses the reference typography and controls for macro, market tabs, and ico
   assert.match(styles, /\.decision-rail nav button\s*\{[^}]*font-size:\s*11px/);
   assert.match(styles, /\.decision-rail nav button\s*\{[^}]*justify-items:\s*center/);
   assert.match(styles, /\.decision-rail nav button span\s*\{[^}]*width:\s*100%[^}]*text-align:\s*center/);
+  assert.match(styles, /\.decision-chart-toolbar \.indicator-control\s*\{[^}]*font-size:\s*12px[^}]*letter-spacing:/);
+  assert.match(styles, /\.decision-chart-toolbar \.indicator-control select\s*\{[^}]*appearance:\s*none[^}]*background:\s*#10181f/);
+  assert.match(styles, /\.decision-chart-toolbar \.indicator-control::after\s*\{[^}]*transform:[^;]*rotate\(45deg\)/);
   assert.match(styles, /\.factor-builder-editor\s*\{[^}]*display:\s*grid[^}]*border-top:/);
   assert.match(styles, /\.factor-builder-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto/);
   assert.match(styles, /\.factor-builder-actions\s*\{[^}]*grid-template-columns:\s*1fr 1fr/);
