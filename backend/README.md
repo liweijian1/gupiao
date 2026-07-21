@@ -40,6 +40,26 @@ The provider Base URL must be HTTPS unless it points to `127.0.0.1`, `localhost`
 or `::1`, and should include its API version prefix (for example,
 `https://api.openai.com/v1`).
 
+## Email accounts and watchlists
+
+Email/password accounts and per-user watchlists are stored in a local SQLite
+database. Passwords are stored only as bcrypt hashes; browser sessions use an
+opaque `HttpOnly`, `SameSite=Lax` cookie. Configure persistent paths and the
+public frontend origin before production deployment:
+
+```text
+AUTH_DB_PATH=/var/lib/stock-macro-terminal/auth.sqlite3
+AUTH_ALLOWED_ORIGINS=https://your-quantdesk-domain.example
+AUTH_COOKIE_PATH=/stock-macro/
+AUTH_COOKIE_SECURE=true
+```
+
+For the current HTTP deployment, use its exact `http://host` value in
+`AUTH_ALLOWED_ORIGINS` and set `AUTH_COOKIE_SECURE=false`. Switch to `true`
+after HTTPS is enabled. Do not put the SQLite database inside a release
+directory. Account writes require the browser's `X-Requested-With: QuantDesk`
+header and a permitted `Origin` or `Referer`.
+
 ## Endpoints
 
 - `GET /health`
@@ -54,6 +74,13 @@ or `::1`, and should include its API version prefix (for example,
 - `PUT /api/ai/config` (`X-AI-Admin-Password`)
 - `POST /api/ai/analyze` (`X-AI-Analysis-Password`)
 - `GET /api/ai/analysis/{ticker}?lang=zh` (`X-AI-Analysis-Password`)
+- `POST /api/auth/register` (`X-Requested-With: QuantDesk`)
+- `POST /api/auth/login` (`X-Requested-With: QuantDesk`)
+- `POST /api/auth/logout` (`X-Requested-With: QuantDesk`)
+- `GET /api/auth/session`
+- `GET /api/watchlist`
+- `PUT /api/watchlist/{ticker}` (`X-Requested-With: QuantDesk`)
+- `DELETE /api/watchlist/{ticker}` (`X-Requested-With: QuantDesk`)
 
 AI analysis is built only from the selected stock snapshot, factor metrics, and
 the current macro snapshot. The latest validated result is cached per ticker and

@@ -16,3 +16,12 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5173",
 ]
+
+AUTH_DB_PATH = Path(os.getenv("AUTH_DB_PATH", CACHE_DIR / "auth.sqlite3"))
+AUTH_COOKIE_NAME = "quantdesk_session"
+AUTH_COOKIE_PATH = os.getenv("AUTH_COOKIE_PATH", "/")
+AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
+AUTH_ALLOWED_ORIGINS = tuple(
+    filter(None, os.getenv("AUTH_ALLOWED_ORIGINS", ",".join(CORS_ORIGINS)).split(","))
+)
+AUTH_SESSION_DAYS = 30

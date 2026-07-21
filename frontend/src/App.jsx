@@ -19,6 +19,7 @@ import { MacroEvidenceBand } from "./components/MacroEvidenceBand.jsx";
 import { StockDecisionWorkspace } from "./components/StockDecisionWorkspace.jsx";
 import { AiResearchPanel } from "./components/AiResearchPanel.jsx";
 import { AiSettingsDialog } from "./components/AiSettingsDialog.jsx";
+import { AuthDialog } from "./components/AuthDialog.jsx";
 import { factorDefaults, macroInputs, macroTrend, spark, stocks } from "./data/mockData.js";
 import {
   useMacroSnapshot,
@@ -28,6 +29,8 @@ import {
   useStockSnapshot,
 } from "./hooks/useMarketData.js";
 import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
+import { useAuth } from "./hooks/useAuth.js";
+import { useWatchlist } from "./hooks/useWatchlist.js";
 import { copy } from "./i18n/copy.js";
 import { downloadAiAnalysisPdf } from "./utils/aiPdfReport.js";
 import {
@@ -55,6 +58,10 @@ export function App() {
   const [analysisPassword, setAnalysisPassword] = useState("");
   const [pendingAnalysisForce, setPendingAnalysisForce] = useState(null);
   const [activeNav, setActiveNav] = useState(0);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [authDialogMode, setAuthDialogMode] = useState("login");
+  const auth = useAuth();
+  const watchlist = useWatchlist({ user: auth.user, authStatus: auth.status });
   const {
     snapshot: macroSnapshot,
     status: macroSnapshotStatus,
@@ -125,8 +132,8 @@ export function App() {
 
   const activeStockUniverse = stockQuery.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
   const baseDetailStockUniverse = useMemo(
-    () => mergeEquityUniverses(stockUniverse, activeStockUniverse),
-    [activeStockUniverse, stockUniverse],
+    () => mergeEquityUniverses(stockUniverse, activeStockUniverse, watchlist.stocks),
+    [activeStockUniverse, stockUniverse, watchlist.stocks],
   );
   const selectedStockBase = resolveSelectedEquity(baseDetailStockUniverse, selectedTicker, stocks[0]);
   const { realtimeQuote, realtimeMeta, realtimeState } = useRealtimeQuote(selectedStockBase);
@@ -137,8 +144,8 @@ export function App() {
     [activeStockUniverse, realtimeQuote],
   );
   const detailStockUniverse = useMemo(
-    () => mergeEquityUniverses(stockUniverse, displayedStockUniverse),
-    [displayedStockUniverse, stockUniverse],
+    () => mergeEquityUniverses(stockUniverse, displayedStockUniverse, watchlist.stocks),
+    [displayedStockUniverse, stockUniverse, watchlist.stocks],
   );
 
   const macroSeries = useMemo(() => {
@@ -186,6 +193,10 @@ export function App() {
     sortKey,
     sectorLabels: t.sectors,
   }), [displayedStockUniverse, factors, sortKey, stockQuery, t.sectors]);
+  const watchlistStocks = useMemo(() => {
+    if (!stockQuery.trim()) return watchlist.stocks;
+    return filterAndSortEquities(watchlist.stocks, { query: stockQuery, factors, sortKey, sectorLabels: t.sectors });
+  }, [factors, sortKey, stockQuery, t.sectors, watchlist.stocks]);
 
   useEffect(() => {
     const selectedIsVisible = filteredStocks.some(
@@ -279,9 +290,25 @@ export function App() {
     });
   };
 
+  const openAuth = (mode = "login") => {
+    setAuthDialogMode(mode);
+    setShowAuthDialog(true);
+  };
+  const handleWatchlistToggle = async () => {
+    if (!auth.user) {
+      openAuth();
+      return;
+    }
+    if (watchlist.tickers.includes(selectedStock.ticker)) {
+      await watchlist.remove(selectedStock.ticker);
+    } else {
+      await watchlist.add(selectedStock.ticker);
+    }
+  };
+
   return (
     <>
-    <AppShell t={t} lang={lang} stockQuery={stockQuery} activeNav={activeNav} stockSourceStatus={stockSourceStatus} macroSourceStatus={macroSourceStatus} reportButtonRef={reportRef} onStockQueryChange={setStockQuery} onLanguageChange={setLang} onNavigate={handleNavigation} onOpenAiSettings={() => setShowAiSettings(true)} onExportReport={handleExportReport}>
+    <AppShell t={t} lang={lang} stockQuery={stockQuery} activeNav={activeNav} stockSourceStatus={stockSourceStatus} macroSourceStatus={macroSourceStatus} reportButtonRef={reportRef} authUser={auth.user} onOpenAuth={() => openAuth()} onLogout={auth.logout} onStockQueryChange={setStockQuery} onLanguageChange={setLang} onNavigate={handleNavigation} onOpenAiSettings={() => setShowAiSettings(true)} onExportReport={handleExportReport}>
       {false && <main className="terminal">
       <aside className="rail">
         <div className="brand">
@@ -346,6 +373,9 @@ export function App() {
           <EquityDiscoveryPanel
             t={t}
             stocks={filteredStocks}
+            watchlistStocks={watchlistStocks}
+            watchlistDetailsStatus={watchlist.detailsStatus}
+            watchlistUnavailableTickers={watchlist.unavailableTickers}
             selectedTicker={selectedTicker}
             factors={factors}
             sortKey={sortKey}
@@ -357,6 +387,7 @@ export function App() {
             providerDiag={providerDiag}
             sectionRef={screenerRef}
             onRetryStockSnapshot={retryStockSnapshot}
+            onRefreshWatchlistStocks={watchlist.refreshStocks}
             onRetrySearch={retrySearch}
             onSelectTicker={setSelectedTicker}
             onFactorsChange={setFactors}
@@ -474,6 +505,8 @@ export function App() {
             indicatorOptions={macroSeries}
             realtimeMeta={realtimeMeta}
             sectionRef={chartRef}
+            isWatchlisted={watchlist.tickers.includes(selectedStock.ticker)}
+            onToggleWatchlist={handleWatchlistToggle}
             onIndicatorChange={setIndicator}
           />
           <AiResearchPanel
@@ -512,9 +545,9 @@ export function App() {
         </div>
       </section></main>}
       <div className="content-grid">
-        <StockDecisionWorkspace t={t} lang={lang} stock={selectedStock} indicator={indicator} indicatorOptions={macroSeries} realtimeMeta={realtimeMeta} sectionRef={chartRef} onIndicatorChange={setIndicator} />
+        <StockDecisionWorkspace t={t} lang={lang} stock={selectedStock} indicator={indicator} indicatorOptions={macroSeries} realtimeMeta={realtimeMeta} sectionRef={chartRef} isWatchlisted={watchlist.tickers.includes(selectedStock.ticker)} onToggleWatchlist={handleWatchlistToggle} onIndicatorChange={setIndicator} />
         <AiResearchPanel t={t} lang={lang} ticker={selectedStock.ticker} score={selectedStock.score} status={aiAnalysis.status} result={aiAnalysis.result} error={aiAnalysis.error} needsPassword={showAnalysisPassword || aiAnalysis.needsPassword} onAnalyze={() => requestAnalysis(false)} onRefresh={() => requestAnalysis(true)} onExport={handleExportAiAnalysis} onSubmitPassword={(password) => { setAnalysisPassword(password); setShowAnalysisPassword(false); if (pendingAnalysisForce === null) setPendingAnalysisForce(false); }} onOpenSettings={() => setShowAiSettings(true)} />
-        <EquityDiscoveryPanel t={t} stocks={filteredStocks} selectedTicker={selectedTicker} factors={factors} sortKey={sortKey} searchState={searchState} stockSourceStatus={stockSourceStatus} realtimeMeta={realtimeMeta} activeProvider={activeProvider} activeProviderHealth={activeProviderHealth} providerDiag={providerDiag} sectionRef={screenerRef} onRetryStockSnapshot={retryStockSnapshot} onRetrySearch={retrySearch} onSelectTicker={setSelectedTicker} onFactorsChange={setFactors} onSortChange={setSortKey} />
+        <EquityDiscoveryPanel t={t} stocks={filteredStocks} watchlistStocks={watchlistStocks} watchlistDetailsStatus={watchlist.detailsStatus} watchlistUnavailableTickers={watchlist.unavailableTickers} selectedTicker={selectedTicker} factors={factors} sortKey={sortKey} searchState={searchState} stockSourceStatus={stockSourceStatus} realtimeMeta={realtimeMeta} activeProvider={activeProvider} activeProviderHealth={activeProviderHealth} providerDiag={providerDiag} sectionRef={screenerRef} onRetryStockSnapshot={retryStockSnapshot} onRefreshWatchlistStocks={watchlist.refreshStocks} onRetrySearch={retrySearch} onSelectTicker={setSelectedTicker} onFactorsChange={setFactors} onSortChange={setSortKey} />
         <MacroEvidenceBand t={t} scores={{ growth: growthScore, liquidity: liquidityScore, inflation: inflationScore, external: externalScore }} cycle={cycle} trendValues={macroTrend} macroSeries={macroSeries} sourceStatus={macroSourceStatus} selectedIndicator={indicator} overviewRef={macroRef} dataMapRef={dataRef} onRetry={retryMacroSnapshot} onSelectIndicator={setIndicator} />
       </div>
     </AppShell>
@@ -523,6 +556,14 @@ export function App() {
         onClose={() => setShowAiSettings(false)}
         onSaved={() => setShowAiSettings(false)}
         t={t}
+      />
+      <AuthDialog
+        open={showAuthDialog}
+        mode={authDialogMode}
+        t={t}
+        onClose={() => setShowAuthDialog(false)}
+        onModeChange={setAuthDialogMode}
+        onSubmit={authDialogMode === "register" ? auth.register : auth.login}
       />
     </>
   );

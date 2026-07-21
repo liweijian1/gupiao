@@ -1,6 +1,7 @@
 import { searchableText } from "./metrics.js";
 
 export const EQUITY_MARKETS = Object.freeze(["CN", "HK", "US"]);
+export const EQUITY_SCOPES = Object.freeze([...EQUITY_MARKETS, "WATCHLIST"]);
 
 const EXCHANGE_MARKETS = Object.freeze({
   SSE: "CN",
@@ -21,6 +22,20 @@ export function filterEquitiesByMarket(items, market = "All") {
   const equities = Array.isArray(items) ? items : [];
   if (market === "All") return [...equities];
   return equities.filter((item) => marketForExchange(item.exchange) === market);
+}
+
+export function orderWatchlistEquities(items, tickers) {
+  const byTicker = new Map(
+    (Array.isArray(items) ? items : []).map((item) => [String(item.ticker ?? "").toUpperCase(), item]),
+  );
+  const seen = new Set();
+  return (Array.isArray(tickers) ? tickers : []).flatMap((ticker) => {
+    const normalizedTicker = String(ticker ?? "").toUpperCase();
+    if (seen.has(normalizedTicker)) return [];
+    seen.add(normalizedTicker);
+    const equity = byTicker.get(normalizedTicker);
+    return equity ? [equity] : [];
+  });
 }
 
 export function mergeEquityUniverses(...universes) {

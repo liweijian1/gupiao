@@ -1306,7 +1306,7 @@ input:disabled {
 .chart-candles line { stroke:#8ca0a7; stroke-width:1; opacity:.72; }.chart-candles .up-candle { fill:#48d5ae; }.chart-candles .down-candle { fill:#f06f74; }.kline-chart .chart-line { opacity:.26; }
 
 /* Reference refinements: market scope, icon rail, and dense macro type. */
-.ranking-tabs { display:grid; grid-template-columns:repeat(3,1fr); align-items:stretch; }
+.ranking-tabs { display:grid; grid-template-columns:repeat(4,1fr); align-items:stretch; }
 .ranking-tabs button { min-height:32px; padding:0; background:transparent; color:#90a0aa; font-size:13px; font-weight:600; }
 .ranking-tabs button:hover { color:#dbe7e9; background:rgba(50,75,76,.2); }.ranking-tabs button.selected { color:var(--cockpit-teal); background:transparent; border-bottom:2px solid var(--cockpit-teal); }
 .decision-rail { background:#0b141b; border-right-color:#26343d; }.decision-rail nav button { font-size:11px; font-weight:600; letter-spacing:0; color:#9eabb4; }.decision-rail nav button.active { background:#173c35; color:#55d9bb; box-shadow:inset -1px 0 0 rgba(116,235,198,.25); }.decision-rail nav button svg { stroke-width:1.7; }
@@ -1535,6 +1535,184 @@ input:disabled {
   color: #82909a;
   font-size: 10px;
   line-height: 1.35;
+}
+
+/* Account and watchlist controls keep the compact terminal chrome intact. */
+.command-account {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 158px;
+  align-items: center;
+  gap: 5px;
+  color: #aebbc3;
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.command-auth {
+  white-space: nowrap;
+}
+
+.stock-title-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.watchlist-toggle {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #2b3b44;
+  border-radius: 5px;
+  background: #10181f;
+  color: #93a4ad;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.watchlist-toggle:hover,
+.watchlist-toggle:focus-visible,
+.watchlist-toggle.saved {
+  border-color: #54d8bd;
+  background: #102a27;
+  color: #d3f75b;
+}
+
+.ranking-empty {
+  margin: 0;
+  padding: 20px 12px;
+  color: #8998a1;
+  font-size: 12px;
+  text-align: center;
+}
+
+.auth-dialog-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 8, 12, .72);
+  backdrop-filter: blur(4px);
+}
+
+.auth-dialog {
+  position: relative;
+  width: min(100%, 390px);
+  padding: 24px;
+  border: 1px solid #30414a;
+  border-radius: 8px;
+  background: #0d151b;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .45);
+}
+
+.auth-dialog > small {
+  color: var(--cockpit-teal);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.auth-dialog h2 {
+  margin: 7px 0 5px;
+  color: #edf4f5;
+  font-size: 20px;
+}
+
+.auth-dialog > p {
+  margin: 0 0 18px;
+  color: #91a0a9;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.auth-dialog form {
+  display: grid;
+  gap: 13px;
+}
+
+.auth-dialog form label {
+  display: grid;
+  gap: 6px;
+  color: #c7d1d4;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-dialog input {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  border: 1px solid #2d3d46;
+  border-radius: 4px;
+  outline: none;
+  padding: 0 10px;
+  background: #10181f;
+  color: #ecf3f4;
+}
+
+.auth-dialog input:focus-visible {
+  border-color: var(--cockpit-teal);
+  box-shadow: 0 0 0 2px rgba(78, 216, 183, .14);
+}
+
+.auth-dialog form label small {
+  color: #7e8d97;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.auth-dialog form .primary {
+  min-height: 38px;
+  margin-top: 2px;
+}
+
+.auth-dialog-error {
+  margin: -2px 0 0;
+  color: #ff8088;
+  font-size: 12px;
+}
+
+.auth-dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #94a3ac;
+  cursor: pointer;
+}
+
+.auth-dialog-close:hover,
+.auth-dialog-close:focus-visible {
+  background: #172229;
+  color: #edf4f5;
+}
+
+.auth-dialog-switch {
+  width: 100%;
+  margin-top: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--cockpit-teal);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+@media (max-width: 1450px) {
+  .command-account {
+    display: none;
+  }
 }
 
 @media (max-width: 1180px) {

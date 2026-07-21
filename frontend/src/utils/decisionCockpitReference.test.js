@@ -24,6 +24,7 @@ test("renders the selected decision-cockpit anatomy instead of card-based placeh
   assert.match(discovery, /setFactorBuilderOpen\(false\)/);
   assert.match(workspace, /candlestick-chart/);
   assert.match(workspace, /factor-strip/);
+  assert.doesNotMatch(workspace, /chart-comparison-label/);
   assert.match(ai, /ai-decision-summary/);
   assert.match(ai, /ai-insight-block/);
   assert.match(macro, /macro-regime-summary/);

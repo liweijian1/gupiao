@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { Star, TrendingDown, TrendingUp } from "lucide-react";
 
 import { spark } from "../data/mockData.js";
 import { selectDecisionChartSeries } from "../utils/decisionChart.js";
@@ -16,7 +16,7 @@ function buildChartPoints(values, width = 720, height = 280, padding = 24) {
   }));
 }
 
-export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOptions, realtimeMeta, sectionRef, onIndicatorChange }) {
+export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOptions, realtimeMeta, sectionRef, isWatchlisted, onToggleWatchlist, onIndicatorChange }) {
   const [timeframe, setTimeframe] = useState("12M");
   const chartSeries = useMemo(() => selectDecisionChartSeries({ baseValues: spark, timeframe, indicator, indicatorOptions }), [indicator, indicatorOptions, timeframe]);
   const points = useMemo(() => buildChartPoints(chartSeries.stockContextValues), [chartSeries.stockContextValues]);
@@ -38,7 +38,7 @@ export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOpt
       <header className="stock-identity">
         <div>
           <small>{t.selectedEquity} · {stock.exchange}</small>
-          <p className="stock-breadcrumb">A股　›　食品饮料　›　白酒</p><h2 id="stock-workspace-title">{stock.name} <span>{stock.ticker}</span></h2>
+          <p className="stock-breadcrumb">A股　›　食品饮料　›　白酒</p><div className="stock-title-row"><h2 id="stock-workspace-title">{stock.name} <span>{stock.ticker}</span></h2><button type="button" className={`watchlist-toggle${isWatchlisted ? " saved" : ""}`} onClick={onToggleWatchlist} aria-pressed={isWatchlisted} aria-label={isWatchlisted ? t.watchlist.remove : t.watchlist.add} title={isWatchlisted ? t.watchlist.remove : t.watchlist.add}><Star size={17} fill={isWatchlisted ? "currentColor" : "none"} /></button></div>
           {realtimeMeta?.updated_at && <p>{t.marketUpdated}: {new Date(realtimeMeta.updated_at).toLocaleString(locale)}</p>}
         </div>
         <div className="stock-price-block">
@@ -65,12 +65,11 @@ export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOpt
         <svg viewBox="0 0 720 280" preserveAspectRatio="none" aria-hidden="true">
           {[64, 118, 172, 226].map((y) => <line className="chart-grid-line" x1="24" x2="696" y1={y} y2={y} key={y} />)}
           <g className="chart-candles">{points.map((point, index) => { const previous = points[Math.max(0, index - 1)]?.y ?? point.y; const rising = point.y <= previous; const top = Math.min(point.y, previous); return <g key={index}><line x1={point.x} x2={point.x} y1={Math.max(30, top - 10)} y2={Math.min(255, Math.max(point.y, previous) + 10)} /><rect x={point.x - candleWidth / 2} y={top} width={candleWidth} height={Math.max(3, Math.abs(point.y - previous))} className={rising ? "up-candle" : "down-candle"} /></g>; })}</g>
-          {comparisonPolyline && <polyline className="chart-comparison-line" points={comparisonPolyline} />}
-          <polyline className="chart-line" points={polyline} />
-          <circle className="chart-endpoint" cx={points.at(-1).x} cy={points.at(-1).y} r="4" />
-        </svg>
-        <span className="chart-comparison-label">{t.macro[indicator] ?? (indicator === "Composite" ? t.composite : indicator)}</span>
-      </div>
+            {comparisonPolyline && <polyline className="chart-comparison-line" points={comparisonPolyline} />}
+            <polyline className="chart-line" points={polyline} />
+            <circle className="chart-endpoint" cx={points.at(-1).x} cy={points.at(-1).y} r="4" />
+          </svg>
+        </div>
       <p className="chart-context-note">{t.chartContextNote}</p>
       <div className="factor-strip">
         {[[t.factors.momentum, stock.trend], [t.factors.quality, stock.score], [t.factors.valuation, 42], [t.factors.liquidity, stock.liquidity], [t.factors.volatility, 39]].map(([label, value]) => <span key={label}><small>{label}</small><b>{value}</b><i><em style={{ width: `${value}%` }} /></i></span>)}

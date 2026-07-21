@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 
 import {
   EQUITY_MARKETS,
+  EQUITY_SCOPES,
   applyRealtimeQuote,
   filterAndSortEquities,
   filterEquitiesByMarket,
   marketForExchange,
   mergeEquityUniverses,
+  orderWatchlistEquities,
   resolveSelectedEquity,
 } from "./equityDiscovery.js";
 
@@ -27,6 +29,7 @@ const equities = [
 
 test("classifies supported exchanges into stable market scopes", () => {
   assert.deepEqual(EQUITY_MARKETS, ["CN", "HK", "US"]);
+  assert.deepEqual(EQUITY_SCOPES, ["CN", "HK", "US", "WATCHLIST"]);
   assert.equal(marketForExchange("SSE"), "CN");
   assert.equal(marketForExchange("szse"), "CN");
   assert.equal(marketForExchange("BSE"), "CN");
@@ -34,6 +37,12 @@ test("classifies supported exchanges into stable market scopes", () => {
   assert.equal(marketForExchange("NASDAQ"), "US");
   assert.equal(marketForExchange("NYSE"), "US");
   assert.equal(marketForExchange("unknown"), null);
+});
+
+test("orders a watchlist by its saved ticker sequence without factor filtering", () => {
+  const ordered = orderWatchlistEquities(equities, ["0700.hk", "600519", "missing", "0700.HK"]);
+  assert.deepEqual(ordered.map((item) => item.ticker), ["0700.HK", "600519"]);
+  assert.deepEqual(equities.map((item) => item.ticker), ["NVDA", "600519", "0700.HK"]);
 });
 
 test("filters a copy of the equity list by market", () => {
