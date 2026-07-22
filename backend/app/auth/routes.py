@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from functools import lru_cache
 from urllib.parse import urlsplit
@@ -13,18 +14,25 @@ from ..config import (
     AUTH_COOKIE_SECURE,
     AUTH_DB_PATH,
     AUTH_SESSION_DAYS,
+    PASSWORD_RESET_TTL_MINUTES,
 )
 from ..stocks import get_stock_snapshot, stock_quote
-from .models import Credentials, normalize_ticker
+from .models import Credentials, PasswordResetConfirmation, PasswordResetRequest, normalize_ticker
+from .password_reset_mailer import PasswordResetMailError, send_password_reset_email
 from .store import AuthStore, AuthUser, EmailAlreadyRegisteredError
 
 
 router = APIRouter(prefix="/api", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
 def get_auth_store() -> AuthStore:
-    return AuthStore(AUTH_DB_PATH, timedelta(days=AUTH_SESSION_DAYS))
+    return AuthStore(
+        AUTH_DB_PATH,
+        timedelta(days=AUTH_SESSION_DAYS),
+        password_reset_ttl=timedelta(minutes=PASSWORD_RESET_TTL_MINUTES),
+    )
 
 
 def _request_origin(request: Request) -> str | None:
@@ -100,6 +108,36 @@ def login(credentials: Credentials, response: Response, store: AuthStore = Depen
     session = store.create_session(user)
     _set_session_cookie(response, session.token)
     return _user_payload(user)
+
+
+@router.post(
+    "/auth/password-reset/request",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_same_origin)],
+)
+def request_password_reset(
+    payload: PasswordResetRequest, store: AuthStore = Depends(get_auth_store)
+) -> Response:
+    token = store.create_password_reset(payload.email)
+    if token:
+        try:
+            send_password_reset_email(payload.email, token)
+        except PasswordResetMailError:
+            logger.exception("Password reset email delivery failed")
+    return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.post(
+    "/auth/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_same_origin)],
+)
+def confirm_password_reset(
+    payload: PasswordResetConfirmation, store: AuthStore = Depends(get_auth_store)
+) -> Response:
+    if not store.consume_password_reset(payload.token, payload.password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail={"code": "password_reset_invalid"})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_same_origin)])

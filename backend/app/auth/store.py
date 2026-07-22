@@ -33,9 +33,15 @@ def hash_session_token(token: str) -> str:
 
 
 class AuthStore:
-    def __init__(self, path: Path, session_ttl: timedelta) -> None:
+    def __init__(
+        self,
+        path: Path,
+        session_ttl: timedelta,
+        password_reset_ttl: timedelta = timedelta(minutes=15),
+    ) -> None:
         self.path = Path(path)
         self.session_ttl = session_ttl
+        self.password_reset_ttl = password_reset_ttl
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize_schema()
 
@@ -68,6 +74,17 @@ class AuthStore:
                     PRIMARY KEY (user_id, ticker)
                 );
                 CREATE INDEX IF NOT EXISTS sessions_expiry_index ON sessions(expires_at);
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token_hash TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    expires_at TEXT NOT NULL,
+                    used_at TEXT,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS password_reset_tokens_expiry_index
+                    ON password_reset_tokens(expires_at);
+                CREATE INDEX IF NOT EXISTS password_reset_tokens_user_index
+                    ON password_reset_tokens(user_id);
                 """
             )
 
@@ -137,6 +154,82 @@ class AuthStore:
             return
         with self._connect() as connection:
             connection.execute("DELETE FROM sessions WHERE token_hash = ?", (hash_session_token(token),))
+
+    def create_password_reset(self, email: str) -> str | None:
+        normalized_email = normalize_email(email)
+        now = self._now()
+        token = secrets.token_urlsafe(32)
+
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM password_reset_tokens WHERE expires_at <= ? OR used_at IS NOT NULL",
+                (now.isoformat(),),
+            )
+            row = connection.execute(
+                "SELECT id FROM users WHERE email = ?",
+                (normalized_email,),
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute("DELETE FROM password_reset_tokens WHERE user_id = ?", (row["id"],))
+            connection.execute(
+                """
+                INSERT INTO password_reset_tokens (token_hash, user_id, expires_at, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    hash_session_token(token),
+                    row["id"],
+                    (now + self.password_reset_ttl).isoformat(),
+                    now.isoformat(),
+                ),
+            )
+
+        return token
+
+    def consume_password_reset(self, raw_token: str | None, password: str) -> bool:
+        if not raw_token:
+            return False
+
+        now = self._now()
+        password_hash = self._password_hash(password)
+        token_hash = hash_session_token(raw_token)
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM password_reset_tokens WHERE expires_at <= ?",
+                (now.isoformat(),),
+            )
+            row = connection.execute(
+                """
+                SELECT token_hash, user_id
+                FROM password_reset_tokens
+                WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+                """,
+                (token_hash, now.isoformat()),
+            ).fetchone()
+            if row is None:
+                return False
+            connection.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (password_hash, row["user_id"]),
+            )
+            connection.execute(
+                "UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?",
+                (now.isoformat(), token_hash),
+            )
+            connection.execute(
+                "DELETE FROM password_reset_tokens WHERE user_id = ? AND token_hash != ?",
+                (row["user_id"], token_hash),
+            )
+            connection.execute("DELETE FROM sessions WHERE user_id = ?", (row["user_id"],))
+
+        return True
+
+    @staticmethod
+    def _password_hash(password: str) -> bytes:
+        from .models import validate_password
+
+        return bcrypt.hashpw(validate_password(password).encode("utf-8"), bcrypt.gensalt())
 
     def list_watchlist_tickers(self, user_id: int) -> list[str]:
         with self._connect() as connection:

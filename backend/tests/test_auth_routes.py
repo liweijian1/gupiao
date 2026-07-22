@@ -108,6 +108,83 @@ def test_login_failure_does_not_disclose_account_existence(client):
     assert response.json()["detail"]["code"] == "invalid_credentials"
 
 
+def test_password_reset_request_does_not_disclose_account_existence(client, monkeypatch):
+    sent_messages = []
+    monkeypatch.setattr(
+        "app.auth.routes.send_password_reset_email",
+        lambda email, token: sent_messages.append((email, token)),
+    )
+    client.post(
+        "/api/auth/register",
+        json={"email": "me@example.com", "password": "correct password"},
+        headers=WRITE_HEADERS,
+    )
+
+    known = client.post(
+        "/api/auth/password-reset/request",
+        json={"email": "me@example.com"},
+        headers=WRITE_HEADERS,
+    )
+    unknown = client.post(
+        "/api/auth/password-reset/request",
+        json={"email": "missing@example.com"},
+        headers=WRITE_HEADERS,
+    )
+
+    assert known.status_code == 202
+    assert unknown.status_code == 202
+    assert len(sent_messages) == 1
+    assert sent_messages[0][0] == "me@example.com"
+
+
+def test_password_reset_changes_credentials_and_revokes_existing_session(client, monkeypatch):
+    sent_messages = []
+    monkeypatch.setattr(
+        "app.auth.routes.send_password_reset_email",
+        lambda email, token: sent_messages.append((email, token)),
+    )
+    client.post(
+        "/api/auth/register",
+        json={"email": "me@example.com", "password": "correct password"},
+        headers=WRITE_HEADERS,
+    )
+    client.post(
+        "/api/auth/password-reset/request",
+        json={"email": "me@example.com"},
+        headers=WRITE_HEADERS,
+    )
+
+    response = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": sent_messages[0][1], "password": "replacement password"},
+        headers=WRITE_HEADERS,
+    )
+
+    assert response.status_code == 204
+    assert client.get("/api/auth/session").json() == {"user": None}
+    assert client.post(
+        "/api/auth/login",
+        json={"email": "me@example.com", "password": "correct password"},
+        headers=WRITE_HEADERS,
+    ).status_code == 401
+    assert client.post(
+        "/api/auth/login",
+        json={"email": "me@example.com", "password": "replacement password"},
+        headers=WRITE_HEADERS,
+    ).status_code == 200
+
+
+def test_password_reset_confirmation_rejects_invalid_or_consumed_tokens(client):
+    invalid = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": "not-a-valid-reset-token", "password": "replacement password"},
+        headers=WRITE_HEADERS,
+    )
+
+    assert invalid.status_code == 400
+    assert invalid.json()["detail"]["code"] == "password_reset_invalid"
+
+
 def test_mutations_reject_requests_without_the_expected_header(client):
     response = client.post(
         "/api/auth/register",

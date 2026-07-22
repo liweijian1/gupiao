@@ -1816,6 +1816,17 @@ input:disabled {
   font-size: 12px;
 }
 
+.auth-dialog-success {
+  margin: 0;
+  border: 1px solid rgba(78, 216, 183, .38);
+  border-radius: 4px;
+  padding: 10px;
+  color: #76e6c7;
+  background: rgba(39, 126, 106, .12);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .auth-dialog-close {
   position: absolute;
   top: 10px;

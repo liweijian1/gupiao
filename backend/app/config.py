@@ -27,3 +27,10 @@ AUTH_ALLOWED_ORIGINS = tuple(
     filter(None, os.getenv("AUTH_ALLOWED_ORIGINS", ",".join(CORS_ORIGINS)).split(","))
 )
 AUTH_SESSION_DAYS = 30
+PASSWORD_RESET_TTL_MINUTES = int(os.getenv("PASSWORD_RESET_TTL_MINUTES", "15"))
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "")
+PASSWORD_RESET_BASE_URL = os.getenv("PASSWORD_RESET_BASE_URL", "")

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getSession, loginAccount, logoutAccount, registerAccount } from "../api/auth.js";
+import {
+  confirmPasswordReset,
+  getSession,
+  loginAccount,
+  logoutAccount,
+  registerAccount,
+  requestPasswordReset,
+} from "../api/auth.js";
 
 export function useAuth() {
   const [state, setState] = useState({ status: "loading", user: null, error: null });
@@ -34,6 +41,11 @@ export function useAuth() {
     await logoutAccount();
     setState({ status: "anonymous", user: null, error: null });
   }, []);
+  const requestReset = useCallback((email) => requestPasswordReset(email), []);
+  const confirmReset = useCallback(async (token, password) => {
+    await confirmPasswordReset(token, password);
+    await restore();
+  }, [restore]);
 
-  return { ...state, login, register, logout, restore };
+  return { ...state, login, register, logout, restore, requestReset, confirmReset };
 }

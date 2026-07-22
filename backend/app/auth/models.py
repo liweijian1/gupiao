@@ -23,6 +23,13 @@ def normalize_ticker(value: str) -> str:
     return ticker
 
 
+def validate_password(value: str) -> str:
+    password = str(value)
+    if not 10 <= len(password) <= 128:
+        raise ValueError("password_length_invalid")
+    return password
+
+
 class Credentials(BaseModel):
     email: str
     password: str
@@ -35,6 +42,31 @@ class Credentials(BaseModel):
     @field_validator("password")
     @classmethod
     def password_has_valid_length(cls, value: str) -> str:
-        if not 10 <= len(value) <= 128:
-            raise ValueError("password_length_invalid")
-        return value
+        return validate_password(value)
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def email_is_valid(cls, value: str) -> str:
+        return normalize_email(value)
+
+
+class PasswordResetConfirmation(BaseModel):
+    token: str
+    password: str
+
+    @field_validator("token")
+    @classmethod
+    def token_is_present(cls, value: str) -> str:
+        token = str(value).strip()
+        if not token:
+            raise ValueError("password_reset_invalid")
+        return token
+
+    @field_validator("password")
+    @classmethod
+    def password_has_valid_length(cls, value: str) -> str:
+        return validate_password(value)

@@ -31,3 +31,5 @@ export const getSession = (signal) => authRequest("/api/auth/session", { signal 
 export const registerAccount = (credentials) => authRequest("/api/auth/register", { method: "POST", body: credentials });
 export const loginAccount = (credentials) => authRequest("/api/auth/login", { method: "POST", body: credentials });
 export const logoutAccount = () => authRequest("/api/auth/logout", { method: "POST" });
+export const requestPasswordReset = (email) => authRequest("/api/auth/password-reset/request", { method: "POST", body: { email } });
+export const confirmPasswordReset = (token, password) => authRequest("/api/auth/password-reset/confirm", { method: "POST", body: { token, password } });

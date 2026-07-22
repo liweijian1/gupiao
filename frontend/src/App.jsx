@@ -46,6 +46,7 @@ import {
 } from "./utils/equityDiscovery.js";
 import { weightedScore } from "./utils/metrics.js";
 import { buildMarkdownReport, downloadMarkdownReport } from "./utils/reportExport.js";
+import { clearPasswordResetPath, getPasswordResetToken } from "./utils/passwordResetUrl.js";
 
 export function App() {
   const [lang, setLang] = useState("zh");
@@ -61,6 +62,7 @@ export function App() {
   const [activeNav, setActiveNav] = useState(0);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [authDialogMode, setAuthDialogMode] = useState("login");
+  const [passwordResetToken, setPasswordResetToken] = useState(() => getPasswordResetToken(window.location.pathname, window.location.search));
   const auth = useAuth();
   const watchlist = useWatchlist({ user: auth.user, authStatus: auth.status });
   const research = useResearch();
@@ -85,6 +87,13 @@ export function App() {
   const navigationLockRef = useRef(false);
   const navigationUnlockTimerRef = useRef(null);
   const t = copy[lang];
+
+  useEffect(() => {
+    if (passwordResetToken) {
+      setAuthDialogMode("reset-confirm");
+      setShowAuthDialog(true);
+    }
+  }, [passwordResetToken]);
 
   const handleNavigation = (index) => {
     navigationLockRef.current = true;
@@ -306,6 +315,15 @@ export function App() {
   const openAuth = (mode = "login") => {
     setAuthDialogMode(mode);
     setShowAuthDialog(true);
+  };
+  const clearPasswordReset = () => {
+    if (!passwordResetToken) return;
+    window.history.replaceState({}, document.title, clearPasswordResetPath(window.location.pathname));
+    setPasswordResetToken(null);
+  };
+  const closeAuth = () => {
+    clearPasswordReset();
+    setShowAuthDialog(false);
   };
   const handleWatchlistToggle = async () => {
     if (!auth.user) {
@@ -611,10 +629,14 @@ export function App() {
       <AuthDialog
         open={showAuthDialog}
         mode={authDialogMode}
+        resetToken={passwordResetToken}
         t={t}
-        onClose={() => setShowAuthDialog(false)}
+        onClose={closeAuth}
         onModeChange={setAuthDialogMode}
         onSubmit={authDialogMode === "register" ? auth.register : auth.login}
+        onRequestReset={auth.requestReset}
+        onConfirmReset={auth.confirmReset}
+        onResetComplete={clearPasswordReset}
       />
     </>
   );
