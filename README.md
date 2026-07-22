@@ -40,7 +40,7 @@ stock-macro-terminal/
 
 ### 环境要求
 
-- Python 3.12+（推荐 3.14，AkShare 需在此环境安装）
+- Python 3.14（常规本地开发）或 Python 3.11（启用 Qlib 日频研究）
 - Node.js 18+
 
 ### 1. 启动后端
@@ -55,6 +55,8 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 未安装 AkShare 时 API 仍可运行，返回 `source: "mock"` 的降级数据。
+
+Qlib 研究数据集、因子排名与回测仅支持 A 股前复权日线，且生产服务必须使用 CPython 3.11。设置 `RESEARCH_DATA_DIR` 到 release 目录外的可持久化位置；首次使用需调用研究数据刷新接口。详细的生产预检与恢复步骤见 [Qlib 研究运行说明](docs/operations/qlib-research.md)。
 
 如需启用 AI 设置与分析接口，启动后端前配置两套不同用途的密码：
 
@@ -126,6 +128,18 @@ AI 服务使用 OpenAI 兼容的 `POST {Base URL}/chat/completions` 协议。Bas
 | GET | `/api/ai/analysis/{ticker}?lang=zh` | `X-AI-Analysis-Password` | 读取当前配置对应的最近缓存 |
 
 AI 只使用后端提供的股票快照、因子和宏观数据，不读取新闻，也不会生成目标价。结果仅供研究参考，不构成投资建议。
+
+### Qlib 研究
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/research/dataset` | 读取当前可复现的数据集版本 |
+| POST | `/api/research/dataset/refresh` | 异步刷新 A 股前复权日线数据集 |
+| GET | `/api/research/ranking` | 使用五项因子权重返回当期排名 |
+| POST | `/api/research/backtests` | 创建只读 Top-N 日频回测 |
+| GET | `/api/research/backtests/{job_id}` | 轮询回测或数据刷新的状态与结果 |
+
+该能力不包含交易执行、订单、经纪商连接或模拟盘。
 
 API 文档：http://127.0.0.1:8000/docs
 

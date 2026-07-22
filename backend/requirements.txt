@@ -4,4 +4,5 @@ baostock>=0.8.9
 bcrypt>=4.1,<5
 numpy>=1.26.0
 pandas>=2.2.0
+pyqlib==0.9.7; python_version >= "3.9" and python_version < "3.13"
 uvicorn[standard]>=0.27.0,<0.31.0

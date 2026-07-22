@@ -97,6 +97,24 @@ def test_cache_contains_no_secrets(service, cache_dir):
     assert payload["analysis"]["disclaimer"] == "仅供研究参考，不构成投资建议。"
 
 
+def test_analysis_payload_keeps_versioned_research_evidence_when_context_has_it(cache_dir, fake_client):
+    service = AiAnalysisService(
+        FakeStore(),
+        AiAnalysisCache(cache_dir),
+        fake_client,
+        lambda ticker: {
+            "stock": {"ticker": ticker},
+            "macro": {},
+            "research_evidence": {"dataset_fingerprint": "d" * 64, "metrics": {"sharpe": 1.2}},
+            "data_as_of": "2026-07-15T00:00:00+00:00",
+        },
+    )
+
+    result = service.analyze("600519", "zh", force=True)
+
+    assert result["research_evidence"]["dataset_fingerprint"] == "d" * 64
+
+
 def test_context_resolves_dynamic_stock_missing_from_snapshot(monkeypatch):
     quote_calls = []
     monkeypatch.setattr(ai_service_module, "get_stock_snapshot", lambda: {

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .auth.routes import router as auth_router
 from .ai.routes import router as ai_router
+from .routers.research import router as research_router
 from .config import CORS_ORIGINS
 from .indicators import INDICATORS
 from .market_data.refresher import (
@@ -42,6 +43,7 @@ app.add_middleware(
 
 app.include_router(ai_router)
 app.include_router(auth_router)
+app.include_router(research_router)
 
 
 @app.on_event("startup")

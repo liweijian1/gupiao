@@ -1470,6 +1470,144 @@ input:disabled {
   min-height: 30px;
 }
 
+.research-stock-evidence {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 20px;
+  border-top: 1px solid var(--cockpit-line);
+  color: #9baab2;
+  font-size: 11px;
+}
+
+.research-stock-evidence b {
+  color: var(--cockpit-teal);
+  font-variant-numeric: tabular-nums;
+}
+
+.research-stock-evidence small {
+  margin-left: auto;
+  color: #71808a;
+}
+
+.research-stock-evidence.muted {
+  color: #76858f;
+}
+
+.research-results-panel {
+  margin: 0 18px 14px;
+  border-top: 1px solid var(--cockpit-line);
+  padding-top: 10px;
+}
+
+.research-results-panel header,
+.research-controls,
+.research-metrics {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.research-results-panel header {
+  justify-content: space-between;
+}
+
+.research-results-panel h3 {
+  margin: 2px 0 0;
+  color: #dce6ea;
+  font-size: 13px;
+}
+
+.research-results-panel header small,
+.research-results-panel header span,
+.research-controls small,
+.research-empty p {
+  color: #8798a2;
+  font-size: 11px;
+}
+
+.research-results-panel header span {
+  border: 1px solid #293841;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.research-controls,
+.research-empty {
+  justify-content: space-between;
+  margin-top: 9px;
+}
+
+.research-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.research-empty p {
+  margin: 0;
+}
+
+.research-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.research-metrics span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid #26343d;
+  background: #10181f;
+}
+
+.research-metrics small {
+  color: #8798a2;
+  font-size: 10px;
+}
+
+.research-metrics b {
+  color: #dce6ea;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.research-error {
+  margin: 8px 0 0;
+  color: #ff8a87;
+  font-size: 11px;
+}
+
+.ai-research-evidence {
+  margin: 8px 12px;
+  padding: 6px 8px;
+  border: 1px solid #29453e;
+  border-radius: 4px;
+  color: #6ee0c3;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .research-stock-evidence,
+  .research-results-panel {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .research-stock-evidence {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .research-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Keep the macro comparison control aligned with the terminal toolbar,
    rather than inheriting the browser's light native select treatment. */
 .decision-chart-toolbar .indicator-control {

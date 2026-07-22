@@ -7,6 +7,9 @@ from hashlib import sha256
 
 from ..service import get_macro_snapshot
 from ..stocks import get_stock_snapshot, stock_quote
+from ..config import RESEARCH_DATA_DIR
+from ..research.dataset import DatasetUnavailable, load_current_manifest
+from ..research.store import ResearchStore
 
 
 DISCLAIMERS = {
@@ -31,6 +34,41 @@ SYSTEM_PROMPTS = {
         "items each; watchlist contains 1 to 5 objects with name, value, and reason."
     ),
 }
+
+
+def load_research_evidence(ticker: str, root=RESEARCH_DATA_DIR) -> dict | None:
+    try:
+        manifest = load_current_manifest(root)
+    except DatasetUnavailable:
+        return None
+    normalized = ticker.strip().upper()
+    for job in ResearchStore(root).list_jobs():
+        result = job.result or {}
+        if (
+            job.kind != "backtest"
+            or job.status != "succeeded"
+            or result.get("dataset_fingerprint") != manifest.fingerprint
+        ):
+            continue
+        held_symbols = {
+            symbol
+            for holding in result.get("holdings", [])
+            for symbol in holding.get("symbols", [])
+        }
+        if normalized not in held_symbols:
+            continue
+        return {
+            "dataset_id": manifest.dataset_id,
+            "dataset_fingerprint": manifest.fingerprint,
+            "dataset_end_date": manifest.end_date.isoformat(),
+            "metrics": result.get("metrics", {}),
+            "sample_period": {
+                "start_date": result.get("request", {}).get("start_date"),
+                "end_date": result.get("request", {}).get("end_date"),
+            },
+            "generated_at": job.updated_at.isoformat(),
+        }
+    return None
 
 
 def load_analysis_context(ticker: str) -> dict:
@@ -76,6 +114,7 @@ def load_analysis_context(ticker: str) -> dict:
             "series": series,
             "source": macro.get("source"),
         },
+        "research_evidence": load_research_evidence(normalized),
         "data_as_of": max(
             str(stock_updated_at or ""),
             str(macro.get("updated_at") or ""),
@@ -137,6 +176,7 @@ class AiAnalysisService:
                 "model": config.model,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "data_as_of": context["data_as_of"],
+                "research_evidence": context.get("research_evidence"),
                 "cached": False,
                 "config_fingerprint": fingerprint,
                 "analysis": analysis.model_dump(),

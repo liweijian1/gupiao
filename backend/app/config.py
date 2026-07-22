@@ -4,6 +4,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CACHE_DIR = ROOT_DIR / "data" / "cache"
+RESEARCH_DATA_DIR = Path(os.getenv("RESEARCH_DATA_DIR", CACHE_DIR / "research"))
+RESEARCH_JOB_TTL_SECONDS = int(os.getenv("RESEARCH_JOB_TTL_SECONDS", "3600"))
 SNAPSHOT_PATH = CACHE_DIR / "macro_snapshot.json"
 AI_CONFIG_PATH = Path(os.getenv("AI_CONFIG_PATH", CACHE_DIR / "ai_config.json"))
 AI_ANALYSIS_CACHE_DIR = Path(os.getenv("AI_ANALYSIS_CACHE_DIR", CACHE_DIR / "ai_analysis"))

@@ -1,10 +1,12 @@
 import { MiniBars } from "./MiniBars.jsx";
 import { ScoreGauge } from "./ScoreGauge.jsx";
 import { MacroDataMap } from "./MacroDataMap.jsx";
+import { ResearchResultsPanel } from "./ResearchResultsPanel.jsx";
 
 export function MacroEvidenceBand({
-  t, scores, cycle, trendValues, macroSeries, sourceStatus, selectedIndicator,
+  t, lang, scores, cycle, trendValues, macroSeries, sourceStatus, selectedIndicator,
   overviewRef, dataMapRef, onRetry, onSelectIndicator,
+  research, onRefreshResearch, onRunBacktest,
 }) {
   const { growth, liquidity, inflation, external } = scores;
   const composite = Math.round((growth + liquidity + (100 - inflation)) / 3);
@@ -48,6 +50,15 @@ export function MacroEvidenceBand({
             <p>{t.currentRead}</p>
           </div>
         </div>
+        <ResearchResultsPanel
+          lang={lang}
+          dataset={research?.dataset}
+          backtest={research?.backtest}
+          status={research?.status}
+          error={research?.error}
+          onRefresh={onRefreshResearch}
+          onBacktest={onRunBacktest}
+        />
       </div>
       <MacroDataMap t={t} series={macroSeries} selectedIndicator={selectedIndicator} sectionRef={dataMapRef} onSelectIndicator={onSelectIndicator} />
     </section>

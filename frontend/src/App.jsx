@@ -31,6 +31,7 @@ import {
 import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
 import { useAuth } from "./hooks/useAuth.js";
 import { useWatchlist } from "./hooks/useWatchlist.js";
+import { useResearch } from "./hooks/useResearch.js";
 import { copy } from "./i18n/copy.js";
 import { downloadAiAnalysisPdf } from "./utils/aiPdfReport.js";
 import {
@@ -62,6 +63,7 @@ export function App() {
   const [authDialogMode, setAuthDialogMode] = useState("login");
   const auth = useAuth();
   const watchlist = useWatchlist({ user: auth.user, authStatus: auth.status });
+  const research = useResearch();
   const {
     snapshot: macroSnapshot,
     status: macroSnapshotStatus,
@@ -143,6 +145,17 @@ export function App() {
     () => applyRealtimeQuote(activeStockUniverse, realtimeQuote),
     [activeStockUniverse, realtimeQuote],
   );
+  const researchRowsByTicker = useMemo(
+    () => new Map((research.ranking?.rows ?? []).map((row) => [row.symbol, row])),
+    [research.ranking],
+  );
+  const researchEnhancedStockUniverse = useMemo(
+    () => displayedStockUniverse.map((stock) => {
+      const row = researchRowsByTicker.get(stock.ticker);
+      return row ? { ...stock, score: Math.round(row.score), researchRank: row.rank } : stock;
+    }),
+    [displayedStockUniverse, researchRowsByTicker],
+  );
   const detailStockUniverse = useMemo(
     () => mergeEquityUniverses(stockUniverse, displayedStockUniverse, watchlist.stocks),
     [displayedStockUniverse, stockUniverse, watchlist.stocks],
@@ -187,12 +200,12 @@ export function App() {
   const externalScore = macroSnapshot?.scores?.external_pressure ?? weightedScore(macroSeries.filter((item) => item.group === "External"));
   const cycle = macroSnapshot?.scores?.cycle ?? (growthScore > 58 && inflationScore < 55 ? "Recovery" : growthScore > 60 && inflationScore >= 55 ? "Overheat" : growthScore < 48 && inflationScore > 55 ? "Stagflation" : "Slowdown");
 
-  const filteredStocks = useMemo(() => filterAndSortEquities(displayedStockUniverse, {
+  const filteredStocks = useMemo(() => filterAndSortEquities(researchEnhancedStockUniverse, {
     query: stockQuery,
     factors,
     sortKey,
     sectorLabels: t.sectors,
-  }), [displayedStockUniverse, factors, sortKey, stockQuery, t.sectors]);
+  }), [researchEnhancedStockUniverse, factors, sortKey, stockQuery, t.sectors]);
   const watchlistStocks = useMemo(() => {
     if (!stockQuery.trim()) return watchlist.stocks;
     return filterAndSortEquities(watchlist.stocks, { query: stockQuery, factors, sortKey, sectorLabels: t.sectors });
@@ -305,6 +318,37 @@ export function App() {
       await watchlist.add(selectedStock.ticker);
     }
   };
+  const researchSymbols = useMemo(
+    () => stockUniverse
+      .map((stock) => stock.ticker)
+      .filter((ticker) => /^\d{6}$/.test(ticker))
+      .slice(0, 80),
+    [stockUniverse],
+  );
+  const researchRange = useMemo(() => {
+    const end = new Date();
+    end.setDate(end.getDate() - 1);
+    const start = new Date(end);
+    start.setFullYear(start.getFullYear() - 2);
+    return {
+      start_date: start.toISOString().slice(0, 10),
+      end_date: end.toISOString().slice(0, 10),
+    };
+  }, []);
+  const refreshResearch = () => research.refreshDataset({
+    symbols: researchSymbols.length ? researchSymbols : [selectedStock.ticker],
+    ...researchRange,
+  });
+  const runResearchRanking = (weights = factors) => research.runRanking(weights);
+  const runResearchBacktest = () => research.runBacktest({
+    symbols: researchSymbols.length ? researchSymbols : [selectedStock.ticker],
+    ...researchRange,
+    top_n: 20,
+    rebalance_frequency: "monthly",
+    transaction_cost_bps: 10,
+    weights: factors,
+  });
+  const selectedResearchRow = researchRowsByTicker.get(selectedStock.ticker);
 
   return (
     <>
@@ -382,6 +426,8 @@ export function App() {
             searchState={searchState}
             stockSourceStatus={stockSourceStatus}
             realtimeMeta={realtimeMeta}
+            researchRow={selectedResearchRow}
+            researchStatus={research.status}
             activeProvider={activeProvider}
             activeProviderHealth={activeProviderHealth}
             providerDiag={providerDiag}
@@ -391,6 +437,7 @@ export function App() {
             onRetrySearch={retrySearch}
             onSelectTicker={setSelectedTicker}
             onFactorsChange={setFactors}
+            onRunResearch={runResearchRanking}
             onSortChange={setSortKey}
           />
           {/* Legacy factor/table panels removed; discovery owns those controls. */}
@@ -541,14 +588,18 @@ export function App() {
             dataMapRef={dataRef}
             onRetry={retryMacroSnapshot}
             onSelectIndicator={setIndicator}
+            lang={lang}
+            research={research}
+            onRefreshResearch={refreshResearch}
+            onRunBacktest={runResearchBacktest}
           />
         </div>
       </section></main>}
       <div className="content-grid">
-        <StockDecisionWorkspace t={t} lang={lang} stock={selectedStock} indicator={indicator} indicatorOptions={macroSeries} realtimeMeta={realtimeMeta} sectionRef={chartRef} isWatchlisted={watchlist.tickers.includes(selectedStock.ticker)} onToggleWatchlist={handleWatchlistToggle} onIndicatorChange={setIndicator} />
+        <StockDecisionWorkspace t={t} lang={lang} stock={selectedStock} indicator={indicator} indicatorOptions={macroSeries} realtimeMeta={realtimeMeta} researchRow={selectedResearchRow} researchStatus={research.status} sectionRef={chartRef} isWatchlisted={watchlist.tickers.includes(selectedStock.ticker)} onToggleWatchlist={handleWatchlistToggle} onIndicatorChange={setIndicator} />
         <AiResearchPanel t={t} lang={lang} ticker={selectedStock.ticker} score={selectedStock.score} status={aiAnalysis.status} result={aiAnalysis.result} error={aiAnalysis.error} needsPassword={showAnalysisPassword || aiAnalysis.needsPassword} onAnalyze={() => requestAnalysis(false)} onRefresh={() => requestAnalysis(true)} onExport={handleExportAiAnalysis} onSubmitPassword={(password) => { setAnalysisPassword(password); setShowAnalysisPassword(false); if (pendingAnalysisForce === null) setPendingAnalysisForce(false); }} onOpenSettings={() => setShowAiSettings(true)} />
-        <EquityDiscoveryPanel t={t} stocks={filteredStocks} watchlistStocks={watchlistStocks} watchlistDetailsStatus={watchlist.detailsStatus} watchlistUnavailableTickers={watchlist.unavailableTickers} selectedTicker={selectedTicker} factors={factors} sortKey={sortKey} searchState={searchState} stockSourceStatus={stockSourceStatus} realtimeMeta={realtimeMeta} activeProvider={activeProvider} activeProviderHealth={activeProviderHealth} providerDiag={providerDiag} sectionRef={screenerRef} onRetryStockSnapshot={retryStockSnapshot} onRefreshWatchlistStocks={watchlist.refreshStocks} onRetrySearch={retrySearch} onSelectTicker={setSelectedTicker} onFactorsChange={setFactors} onSortChange={setSortKey} />
-        <MacroEvidenceBand t={t} scores={{ growth: growthScore, liquidity: liquidityScore, inflation: inflationScore, external: externalScore }} cycle={cycle} trendValues={macroTrend} macroSeries={macroSeries} sourceStatus={macroSourceStatus} selectedIndicator={indicator} overviewRef={macroRef} dataMapRef={dataRef} onRetry={retryMacroSnapshot} onSelectIndicator={setIndicator} />
+        <EquityDiscoveryPanel t={t} stocks={filteredStocks} watchlistStocks={watchlistStocks} watchlistDetailsStatus={watchlist.detailsStatus} watchlistUnavailableTickers={watchlist.unavailableTickers} selectedTicker={selectedTicker} factors={factors} sortKey={sortKey} searchState={searchState} stockSourceStatus={stockSourceStatus} realtimeMeta={realtimeMeta} activeProvider={activeProvider} activeProviderHealth={activeProviderHealth} providerDiag={providerDiag} sectionRef={screenerRef} onRetryStockSnapshot={retryStockSnapshot} onRefreshWatchlistStocks={watchlist.refreshStocks} onRetrySearch={retrySearch} onSelectTicker={setSelectedTicker} onFactorsChange={setFactors} onRunResearch={runResearchRanking} onSortChange={setSortKey} />
+        <MacroEvidenceBand t={t} lang={lang} scores={{ growth: growthScore, liquidity: liquidityScore, inflation: inflationScore, external: externalScore }} cycle={cycle} trendValues={macroTrend} macroSeries={macroSeries} sourceStatus={macroSourceStatus} selectedIndicator={indicator} overviewRef={macroRef} dataMapRef={dataRef} onRetry={retryMacroSnapshot} onSelectIndicator={setIndicator} research={research} onRefreshResearch={refreshResearch} onRunBacktest={runResearchBacktest} />
       </div>
     </AppShell>
       <AiSettingsDialog

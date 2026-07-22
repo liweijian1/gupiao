@@ -10,7 +10,7 @@ const FACTOR_PRESETS = [
   { momentum: 68, quality: 52, valuation: 85, liquidity: 70, volatility: 45 },
 ];
 
-export function EquityDiscoveryPanel({ t, stocks, watchlistStocks, watchlistDetailsStatus, watchlistUnavailableTickers, selectedTicker, factors, sortKey, searchState, stockSourceStatus, realtimeMeta, sectionRef, onRetryStockSnapshot, onRefreshWatchlistStocks, onRetrySearch, onSelectTicker, onFactorsChange, onSortChange }) {
+export function EquityDiscoveryPanel({ t, stocks, watchlistStocks, watchlistDetailsStatus, watchlistUnavailableTickers, selectedTicker, factors, sortKey, searchState, stockSourceStatus, realtimeMeta, sectionRef, onRetryStockSnapshot, onRefreshWatchlistStocks, onRetrySearch, onSelectTicker, onFactorsChange, onRunResearch, onSortChange }) {
   const [activeMarket, setActiveMarket] = useState("CN");
   const [isFactorBuilderOpen, setFactorBuilderOpen] = useState(false);
   const [draftFactors, setDraftFactors] = useState(() => copyFactorDraft(factors));
@@ -20,7 +20,11 @@ export function EquityDiscoveryPanel({ t, stocks, watchlistStocks, watchlistDeta
   const selectMarket = (market) => { setActiveMarket(market); const rows = market === "WATCHLIST" ? savedStocks : filterEquitiesByMarket(stocks, market); if (rows.length && !rows.some((item) => item.ticker === selectedTicker)) onSelectTicker(rows[0].ticker); };
   const openFactorBuilder = () => { setDraftFactors(copyFactorDraft(factors)); setFactorBuilderOpen(true); };
   const cancelFactorBuilder = () => setFactorBuilderOpen(false);
-  const applyFactorBuilder = () => { onFactorsChange(copyFactorDraft(draftFactors)); setFactorBuilderOpen(false); };
+  const applyFactorBuilder = () => {
+    onFactorsChange(copyFactorDraft(draftFactors));
+    onRunResearch?.(copyFactorDraft(draftFactors));
+    setFactorBuilderOpen(false);
+  };
   useEffect(() => {
     if (activeMarket === "WATCHLIST") onRefreshWatchlistStocks?.().catch(() => {});
   }, [activeMarket, onRefreshWatchlistStocks]);
@@ -41,7 +45,7 @@ export function EquityDiscoveryPanel({ t, stocks, watchlistStocks, watchlistDeta
     {isFactorBuilderOpen && <section className="factor-builder-editor" id="factor-builder-editor" aria-label={t.factorBuilder}>
       {FACTOR_KEYS.map((key) => <label className="factor-builder-row" key={key}><span>{t.factors[key]}</span><b>{draftFactors[key]}</b><input type="range" min="0" max="100" value={draftFactors[key]} onChange={(event) => setDraftFactors((draft) => setDraftFactor(draft, key, event.target.value))} aria-label={t.factors[key]} /></label>)}
       <div className="factor-builder-presets">{FACTOR_PRESETS.map((preset, index) => <button type="button" key={t.chips[index]} onClick={() => setDraftFactors(copyFactorDraft(preset))}>{t.chips[index]}</button>)}</div>
-      <div className="factor-builder-actions"><button type="button" className="ghost" onClick={cancelFactorBuilder}>{t.cancel}</button><button type="button" className="primary" onClick={applyFactorBuilder}>{t.apply}</button></div>
+      <div className="factor-builder-actions"><button type="button" className="ghost" onClick={cancelFactorBuilder}>{t.cancel}</button><button type="button" className="primary" onClick={applyFactorBuilder}>{t.apply} · 运行排名</button></div>
     </section>}
     {message && <div className="ranking-status" role="status">{message}{(searchState === "error" || stockSourceStatus.retryTarget === "snapshot") && <button type="button" onClick={searchState === "error" ? onRetrySearch : onRetryStockSnapshot}><RefreshCcw size={13} /> {t.retry}</button>}</div>}
     <div className="ranking-columns"><span>{langLabel(t)}</span><span>{t.sort.score}</span><span>{t.growth}</span></div>

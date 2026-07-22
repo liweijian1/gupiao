@@ -16,7 +16,7 @@ function buildChartPoints(values, width = 720, height = 280, padding = 24) {
   }));
 }
 
-export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOptions, realtimeMeta, sectionRef, isWatchlisted, onToggleWatchlist, onIndicatorChange }) {
+export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOptions, realtimeMeta, researchRow, researchStatus, sectionRef, isWatchlisted, onToggleWatchlist, onIndicatorChange }) {
   const [timeframe, setTimeframe] = useState("12M");
   const chartSeries = useMemo(() => selectDecisionChartSeries({ baseValues: spark, timeframe, indicator, indicatorOptions }), [indicator, indicatorOptions, timeframe]);
   const points = useMemo(() => buildChartPoints(chartSeries.stockContextValues), [chartSeries.stockContextValues]);
@@ -71,6 +71,8 @@ export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOpt
           </svg>
         </div>
       <p className="chart-context-note">{t.chartContextNote}</p>
+      {researchRow && <div className="research-stock-evidence"><span>{lang === "zh" ? "研究排名" : "Research rank"} <b>#{researchRow.rank}</b></span><span>{lang === "zh" ? "研究综合分" : "Research score"} <b>{researchRow.score}</b></span><small>{lang === "zh" ? "与当前数据版本一致" : "Matched to the active dataset"}</small></div>}
+      {!researchRow && researchStatus === "unavailable" && <div className="research-stock-evidence muted">{lang === "zh" ? "尚无研究数据；可在下方证据区刷新。" : "No research dataset; refresh it in the evidence band."}</div>}
       <div className="factor-strip">
         {[[t.factors.momentum, stock.trend], [t.factors.quality, stock.score], [t.factors.valuation, 42], [t.factors.liquidity, stock.liquidity], [t.factors.volatility, 39]].map(([label, value]) => <span key={label}><small>{label}</small><b>{value}</b><i><em style={{ width: `${value}%` }} /></i></span>)}
       </div>
