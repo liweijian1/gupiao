@@ -60,6 +60,27 @@ after HTTPS is enabled. Do not put the SQLite database inside a release
 directory. Account writes require the browser's `X-Requested-With: QuantDesk`
 header and a permitted `Origin` or `Referer`.
 
+## Password reset email
+
+Password-reset tokens are random, stored only as SHA-256 hashes, expire after
+15 minutes, and can be used once. A successful reset revokes every active
+session for that account. Configure the mailer only in the server process
+environment (for example, a root-owned systemd drop-in):
+
+```text
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USERNAME=<sender email>
+SMTP_PASSWORD=<SMTP authorization code>
+SMTP_FROM_EMAIL=<sender email>
+PASSWORD_RESET_BASE_URL=https://your-quantdesk-domain.example/stock-macro
+PASSWORD_RESET_TTL_MINUTES=15
+```
+
+Never commit `SMTP_PASSWORD`, store it in the frontend, or include reset links
+in logs. The request endpoint always returns the same response whether an email
+address is registered or not.
+
 ## Endpoints
 
 - `GET /health`
@@ -77,6 +98,8 @@ header and a permitted `Origin` or `Referer`.
 - `POST /api/auth/register` (`X-Requested-With: QuantDesk`)
 - `POST /api/auth/login` (`X-Requested-With: QuantDesk`)
 - `POST /api/auth/logout` (`X-Requested-With: QuantDesk`)
+- `POST /api/auth/password-reset/request` (`X-Requested-With: QuantDesk`)
+- `POST /api/auth/password-reset/confirm` (`X-Requested-With: QuantDesk`)
 - `GET /api/auth/session`
 - `GET /api/watchlist`
 - `PUT /api/watchlist/{ticker}` (`X-Requested-With: QuantDesk`)
