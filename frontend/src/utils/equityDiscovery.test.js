@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   EQUITY_MARKETS,
@@ -84,6 +85,40 @@ test("overlays a realtime quote and its essential market metadata only on the ma
   const detailUniverse = mergeEquityUniverses(equities, result);
   assert.equal(resolveSelectedEquity(detailUniverse, "600519", equities[0]).price, 1500);
   assert.equal(equities[1].price, 1468);
+});
+
+test("keeps realtime quote fields ahead of a saved watchlist snapshot in the detail workspace", () => {
+  const savedWatchlistStock = {
+    ...equities[1],
+    price: 1468,
+    chg: 0.7,
+    source: "baostock",
+  };
+  const realtimeUniverse = applyRealtimeQuote(equities, {
+    ticker: "600519",
+    price: 1500,
+    chg: 1.2,
+    open: 1492,
+    high: 1512,
+    low: 1488,
+    previous_close: 1482,
+    volume: 123456,
+    amount: 987654,
+    source: "realtime",
+  });
+  const detailUniverse = mergeEquityUniverses(equities, [savedWatchlistStock], realtimeUniverse);
+  const selected = resolveSelectedEquity(detailUniverse, "600519", equities[0]);
+
+  assert.equal(selected.price, 1500);
+  assert.equal(selected.high, 1512);
+  assert.equal(selected.previous_close, 1482);
+  assert.equal(selected.source, "realtime");
+
+  const appSource = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
+  assert.match(
+    appSource,
+    /mergeEquityUniverses\(stockUniverse, watchlist\.stocks, displayedStockUniverse\)/,
+  );
 });
 
 test("resolves the selected equity and falls back without clearing the universe", () => {

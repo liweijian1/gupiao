@@ -157,7 +157,7 @@ export function App() {
     [displayedStockUniverse, researchRowsByTicker],
   );
   const detailStockUniverse = useMemo(
-    () => mergeEquityUniverses(stockUniverse, displayedStockUniverse, watchlist.stocks),
+    () => mergeEquityUniverses(stockUniverse, watchlist.stocks, displayedStockUniverse),
     [displayedStockUniverse, stockUniverse, watchlist.stocks],
   );
 
