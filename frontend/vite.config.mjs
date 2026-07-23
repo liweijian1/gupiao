@@ -8,6 +8,12 @@ export default defineConfig({
     include: ["react", "react-dom/client"],
   },
   server: {
+    proxy: {
+      "/quantdesk-api": {
+        target: "http://127.0.0.1:8000",
+        rewrite: (path) => path.replace("/quantdesk-api", ""),
+      },
+    },
     warmup: {
       clientFiles: ["./src/main.jsx"],
     },
