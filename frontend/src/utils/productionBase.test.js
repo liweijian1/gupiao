@@ -18,3 +18,10 @@ test("uses an unblocked same-origin development API proxy", async () => {
   assert.match(viteConfig, /proxy:\s*\{[\s\S]*"\/quantdesk-api"\s*:\s*\{/);
   assert.match(viteConfig, /rewrite:\s*\(path\)\s*=>\s*path\.replace\("\/quantdesk-api",\s*""\)/);
 });
+
+test("removes a trailing API segment from an explicitly configured API base", async () => {
+  const apiConfig = await readFile(new URL("../config.js", import.meta.url), "utf8");
+
+  assert.match(apiConfig, /VITE_API_BASE_URL\s*\?\?\s*"\/quantdesk-api"/);
+  assert.match(apiConfig, /\.replace\(\/\\\/api\$\/,\s*""\)/);
+});
