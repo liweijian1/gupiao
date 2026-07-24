@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth.routes import router as auth_router
@@ -14,6 +14,11 @@ from .market_data.refresher import (
     quote_cache_refresher_status,
     start_quote_cache_refresher,
     stop_quote_cache_refresher,
+)
+from .market_data.stock_history import (
+    StockHistoryUnavailable,
+    StockHistoryUnsupportedMarket,
+    get_stock_history,
 )
 from .service import get_macro_snapshot, refresh_macro_snapshot
 from .stocks import (
@@ -116,6 +121,26 @@ def stocks_quote(symbol: str = Query(...)) -> Dict[str, Any]:
 @app.get("/api/stocks/realtime")
 def stocks_realtime(symbol: str = Query(...), force: bool = Query(default=False)) -> Dict[str, Any]:
     return stock_realtime_quote(symbol, force_refresh=force)
+
+
+@app.get("/api/stocks/history")
+def stocks_history(
+    symbol: str = Query(..., pattern=r"^\d{6}$"),
+    range: str = Query(default="12M", pattern=r"^(1M|3M|12M|3Y)$"),
+    adjust: str = Query(default="qfq", pattern=r"^(qfq|none|hfq)$"),
+) -> Dict[str, Any]:
+    try:
+        return get_stock_history(symbol=symbol, range_key=range, adjust=adjust)
+    except StockHistoryUnsupportedMarket as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "history_unsupported_market", "message": str(exc)},
+        ) from exc
+    except StockHistoryUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "history_unavailable", "message": str(exc)},
+        ) from exc
 
 
 @app.post("/api/stocks/refresh")
