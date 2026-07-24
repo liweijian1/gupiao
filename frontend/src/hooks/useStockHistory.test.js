@@ -11,4 +11,6 @@ test("history hook targets the API with cancellable range and adjustment request
   assert.match(source, /range/);
   assert.match(source, /adjust/);
   assert.match(source, /unsupported/);
+  assert.match(source, /history_unavailable/);
+  assert.match(source, /setState\("unavailable"\)/);
 });

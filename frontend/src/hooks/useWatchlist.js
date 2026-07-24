@@ -44,12 +44,12 @@ export function useWatchlist({ user, authStatus }) {
   }, [user]);
 
   useEffect(() => {
-    if (authStatus === "authenticated") refresh().catch(() => {});
+    if (authStatus === "authenticated") refreshStocks().catch(() => {});
     if (authStatus === "anonymous") {
       setState({ status: "idle", tickers: [], error: null });
       setDetailState({ detailsStatus: "idle", stocks: [], unavailableTickers: [], detailsError: null });
     }
-  }, [authStatus, refresh]);
+  }, [authStatus, refreshStocks]);
 
   const add = useCallback(async (ticker) => {
     await addWatchlistTicker(ticker);

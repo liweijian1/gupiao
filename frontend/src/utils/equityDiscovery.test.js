@@ -6,6 +6,7 @@ import {
   EQUITY_MARKETS,
   EQUITY_SCOPES,
   applyRealtimeQuote,
+  applyRealtimeQuotes,
   filterAndSortEquities,
   filterEquitiesByMarket,
   marketForExchange,
@@ -87,6 +88,23 @@ test("overlays a realtime quote and its essential market metadata only on the ma
   assert.equal(equities[1].price, 1468);
 });
 
+test("overlays independent realtime quotes without changing saved watchlist order or metadata", () => {
+  const saved = [
+    { ...equities[1], score: 83, sector: "Consumer", price: 1468 },
+    { ...equities[2], score: 25, sector: "Internet", price: 418 },
+  ];
+  const result = applyRealtimeQuotes(saved, [
+    { ticker: "600519", price: 1500, chg: 1.2, high: 1512 },
+    { ticker: "0700.HK", price: 430, chg: 2.1 },
+  ]);
+
+  assert.deepEqual(result.map((item) => item.ticker), ["600519", "0700.HK"]);
+  assert.equal(result[0].score, 83);
+  assert.equal(result[0].sector, "Consumer");
+  assert.equal(result[0].price, 1500);
+  assert.equal(result[1].price, 430);
+});
+
 test("keeps realtime quote fields ahead of a saved watchlist snapshot in the detail workspace", () => {
   const savedWatchlistStock = {
     ...equities[1],
@@ -117,7 +135,7 @@ test("keeps realtime quote fields ahead of a saved watchlist snapshot in the det
   const appSource = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
   assert.match(
     appSource,
-    /mergeEquityUniverses\(stockUniverse, watchlist\.stocks, displayedStockUniverse\)/,
+    /mergeEquityUniverses\(stockUniverse, liveWatchlistStocks, displayedStockUniverse\)/,
   );
 });
 

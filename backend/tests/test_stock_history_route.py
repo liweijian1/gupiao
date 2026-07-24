@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app import main
+from app.market_data.stock_history import StockHistoryUnavailable
 
 
 def test_history_route_returns_normalized_payload(monkeypatch):
@@ -32,3 +33,18 @@ def test_history_route_rejects_invalid_query_values():
     assert client.get("/api/stocks/history?symbol=MSFT&range=12M&adjust=qfq").status_code == 422
     assert client.get("/api/stocks/history?symbol=600519&range=5Y&adjust=qfq").status_code == 422
     assert client.get("/api/stocks/history?symbol=600519&range=1M&adjust=invalid").status_code == 422
+
+
+def test_history_route_hides_upstream_exception(monkeypatch):
+    def unavailable(**_kwargs):
+        raise StockHistoryUnavailable("RemoteDisconnected secret upstream detail")
+
+    monkeypatch.setattr(main, "get_stock_history", unavailable)
+
+    response = TestClient(main.app).get("/api/stocks/history?symbol=600519")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "code": "history_unavailable",
+        "message": "Historical market data is temporarily unavailable.",
+    }

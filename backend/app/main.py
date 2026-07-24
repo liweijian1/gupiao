@@ -139,7 +139,10 @@ def stocks_history(
     except StockHistoryUnavailable as exc:
         raise HTTPException(
             status_code=503,
-            detail={"code": "history_unavailable", "message": str(exc)},
+            detail={
+                "code": "history_unavailable",
+                "message": "Historical market data is temporarily unavailable.",
+            },
         ) from exc
 
 

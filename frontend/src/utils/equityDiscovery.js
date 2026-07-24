@@ -56,6 +56,13 @@ export function applyRealtimeQuote(items, quote) {
   ));
 }
 
+export function applyRealtimeQuotes(items, quotes) {
+  return (Array.isArray(quotes) ? quotes : []).reduce(
+    (equities, quote) => applyRealtimeQuote(equities, quote),
+    Array.isArray(items) ? items : [],
+  );
+}
+
 export function resolveSelectedEquity(items, ticker, fallback) {
   const equities = Array.isArray(items) ? items : [];
   return equities.find((item) => item.ticker === ticker) ?? equities[0] ?? fallback;

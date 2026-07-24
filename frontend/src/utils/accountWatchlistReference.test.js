@@ -30,6 +30,7 @@ test("loads saved stock records from the watchlist details endpoint", () => {
 
   assert.match(api, /getWatchlistStocks/);
   assert.match(hook, /refreshStocks/);
+  assert.match(hook, /authStatus === "authenticated"\) refreshStocks\(\)/);
   assert.match(app, /watchlist\.stocks/);
   assert.match(discovery, /onRefreshWatchlistStocks/);
   assert.match(discovery, /watchlistDetailsStatus/);

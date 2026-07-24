@@ -31,7 +31,9 @@ export function useStockHistory({ stock, range, adjust }) {
       .then(async (response) => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new Error(body?.detail?.message || body?.detail || `History API returned ${response.status}`);
+          const error = new Error(body?.detail?.message || body?.detail || `History API returned ${response.status}`);
+          error.code = body?.detail?.code;
+          throw error;
         }
         return body;
       })
@@ -41,8 +43,13 @@ export function useStockHistory({ stock, range, adjust }) {
       })
       .catch((nextError) => {
         if (nextError.name !== "AbortError") {
-          setError(nextError.message);
-          setState("error");
+          if (nextError.code === "history_unavailable") {
+            setError(null);
+            setState("unavailable");
+          } else {
+            setError(nextError.message);
+            setState("error");
+          }
         }
       });
 

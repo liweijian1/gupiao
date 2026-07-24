@@ -31,6 +31,7 @@ import {
 import { useAiAnalysis } from "./hooks/useAiAnalysis.js";
 import { useAuth } from "./hooks/useAuth.js";
 import { useWatchlist } from "./hooks/useWatchlist.js";
+import { useWatchlistRealtime } from "./hooks/useWatchlistRealtime.js";
 import { useResearch } from "./hooks/useResearch.js";
 import { copy } from "./i18n/copy.js";
 import { downloadAiAnalysisPdf } from "./utils/aiPdfReport.js";
@@ -65,6 +66,7 @@ export function App() {
   const [passwordResetToken, setPasswordResetToken] = useState(() => getPasswordResetToken(window.location.pathname, window.location.search));
   const auth = useAuth();
   const watchlist = useWatchlist({ user: auth.user, authStatus: auth.status });
+  const liveWatchlistStocks = useWatchlistRealtime({ user: auth.user, stocks: watchlist.stocks });
   const research = useResearch();
   const {
     snapshot: macroSnapshot,
@@ -143,8 +145,8 @@ export function App() {
 
   const activeStockUniverse = stockQuery.trim() && searchSnapshot ? searchSnapshot.stocks ?? [] : stockUniverse;
   const baseDetailStockUniverse = useMemo(
-    () => mergeEquityUniverses(stockUniverse, activeStockUniverse, watchlist.stocks),
-    [activeStockUniverse, stockUniverse, watchlist.stocks],
+    () => mergeEquityUniverses(stockUniverse, activeStockUniverse, liveWatchlistStocks),
+    [activeStockUniverse, liveWatchlistStocks, stockUniverse],
   );
   const selectedStockBase = resolveSelectedEquity(baseDetailStockUniverse, selectedTicker, stocks[0]);
   const { realtimeQuote, realtimeMeta, realtimeState } = useRealtimeQuote(selectedStockBase);
@@ -166,8 +168,8 @@ export function App() {
     [displayedStockUniverse, researchRowsByTicker],
   );
   const detailStockUniverse = useMemo(
-    () => mergeEquityUniverses(stockUniverse, watchlist.stocks, displayedStockUniverse),
-    [displayedStockUniverse, stockUniverse, watchlist.stocks],
+    () => mergeEquityUniverses(stockUniverse, liveWatchlistStocks, displayedStockUniverse),
+    [displayedStockUniverse, liveWatchlistStocks, stockUniverse],
   );
 
   const macroSeries = useMemo(() => {
@@ -216,9 +218,9 @@ export function App() {
     sectorLabels: t.sectors,
   }), [researchEnhancedStockUniverse, factors, sortKey, stockQuery, t.sectors]);
   const watchlistStocks = useMemo(() => {
-    if (!stockQuery.trim()) return watchlist.stocks;
-    return filterAndSortEquities(watchlist.stocks, { query: stockQuery, factors, sortKey, sectorLabels: t.sectors });
-  }, [factors, sortKey, stockQuery, t.sectors, watchlist.stocks]);
+    if (!stockQuery.trim()) return liveWatchlistStocks;
+    return filterAndSortEquities(liveWatchlistStocks, { query: stockQuery, factors, sortKey, sectorLabels: t.sectors });
+  }, [factors, liveWatchlistStocks, sortKey, stockQuery, t.sectors]);
 
   useEffect(() => {
     const selectedIsVisible = filteredStocks.some(
