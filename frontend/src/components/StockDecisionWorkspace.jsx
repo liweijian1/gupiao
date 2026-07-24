@@ -1,29 +1,7 @@
-import { useMemo, useState } from "react";
 import { Star, TrendingDown, TrendingUp } from "lucide-react";
+import { HistoricalStockChart } from "./HistoricalStockChart.jsx";
 
-import { spark } from "../data/mockData.js";
-import { selectDecisionChartSeries } from "../utils/decisionChart.js";
-
-const TIMEFRAMES = ["1M", "3M", "12M", "3Y"];
-
-function buildChartPoints(values, width = 720, height = 280, padding = 24) {
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const range = Math.max(1, maximum - minimum);
-  return values.map((value, index) => ({
-    x: padding + (index / Math.max(1, values.length - 1)) * (width - padding * 2),
-    y: height - padding - ((value - minimum) / range) * (height - padding * 2),
-  }));
-}
-
-export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOptions, realtimeMeta, researchRow, researchStatus, sectionRef, isWatchlisted, onToggleWatchlist, onIndicatorChange }) {
-  const [timeframe, setTimeframe] = useState("12M");
-  const chartSeries = useMemo(() => selectDecisionChartSeries({ baseValues: spark, timeframe, indicator, indicatorOptions }), [indicator, indicatorOptions, timeframe]);
-  const points = useMemo(() => buildChartPoints(chartSeries.stockContextValues), [chartSeries.stockContextValues]);
-  const comparisonPoints = useMemo(() => chartSeries.comparisonValues ? buildChartPoints(chartSeries.comparisonValues) : [], [chartSeries.comparisonValues]);
-  const polyline = points.map(({ x, y }) => `${x},${y}`).join(" ");
-  const comparisonPolyline = comparisonPoints.map(({ x, y }) => `${x},${y}`).join(" ");
-  const candleWidth = Math.max(3, 520 / Math.max(1, points.length));
+export function StockDecisionWorkspace({ t, lang, stock, realtimeMeta, researchRow, researchStatus, sectionRef, isWatchlisted, onToggleWatchlist }) {
   const change = Number(stock.chg ?? 0);
   const positive = change >= 0;
   const locale = lang === "zh" ? "zh-CN" : "en-US";
@@ -55,22 +33,7 @@ export function StockDecisionWorkspace({ t, lang, stock, indicator, indicatorOpt
         <span>{t.amount}<b>{formatNumber(stock.amount, { compact: true })}</b></span>
         <span>{t.turnover}<b>{Number.isFinite(Number(stock.turnover)) ? `${formatNumber(stock.turnover)}%` : "--"}</b></span>
       </div>
-      <div className="chart-toolbar decision-chart-toolbar">
-        <div className="timeframe-control" role="group" aria-label={t.timeframe}>
-          {TIMEFRAMES.map((item) => <button type="button" className={timeframe === item ? "selected" : ""} aria-pressed={timeframe === item} onClick={() => setTimeframe(item)} key={item}>{item}</button>)}
-        </div>
-        <label className="indicator-control"><span>{t.comparison}</span><select value={indicator} onChange={(event) => onIndicatorChange(event.target.value)}><option value="Composite">{t.composite}</option>{indicatorOptions.map((item) => <option value={item.key} key={item.key}>{t.macro[item.key] ?? item.key}</option>)}</select></label>
-      </div>
-      <div className="price-chart kline-chart" role="img" aria-label={`${t.priceChart}: ${stock.ticker}, ${timeframe}`}>
-        <svg viewBox="0 0 720 280" preserveAspectRatio="none" aria-hidden="true">
-          {[64, 118, 172, 226].map((y) => <line className="chart-grid-line" x1="24" x2="696" y1={y} y2={y} key={y} />)}
-          <g className="chart-candles">{points.map((point, index) => { const previous = points[Math.max(0, index - 1)]?.y ?? point.y; const rising = point.y <= previous; const top = Math.min(point.y, previous); return <g key={index}><line x1={point.x} x2={point.x} y1={Math.max(30, top - 10)} y2={Math.min(255, Math.max(point.y, previous) + 10)} /><rect x={point.x - candleWidth / 2} y={top} width={candleWidth} height={Math.max(3, Math.abs(point.y - previous))} className={rising ? "up-candle" : "down-candle"} /></g>; })}</g>
-            {comparisonPolyline && <polyline className="chart-comparison-line" points={comparisonPolyline} />}
-            <polyline className="chart-line" points={polyline} />
-            <circle className="chart-endpoint" cx={points.at(-1).x} cy={points.at(-1).y} r="4" />
-          </svg>
-        </div>
-      <p className="chart-context-note">{t.chartContextNote}</p>
+      <HistoricalStockChart stock={stock} t={t} lang={lang} />
       {researchRow && <div className="research-stock-evidence"><span>{lang === "zh" ? "研究排名" : "Research rank"} <b>#{researchRow.rank}</b></span><span>{lang === "zh" ? "研究综合分" : "Research score"} <b>{researchRow.score}</b></span><small>{lang === "zh" ? "与当前数据版本一致" : "Matched to the active dataset"}</small></div>}
       {!researchRow && researchStatus === "unavailable" && <div className="research-stock-evidence muted">{lang === "zh" ? "尚无研究数据；可在下方证据区刷新。" : "No research dataset; refresh it in the evidence band."}</div>}
       <div className="factor-strip">
